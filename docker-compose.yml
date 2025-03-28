@@ -27,6 +27,7 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_NAME:-mas_framework}
+      PGPASSWORD: ${DB_PASSWORD:-postgres} # Set PGPASSWORD for psql authentication
     command: [ "psql", "-h", "postgres", "-U", "${DB_USER:-postgres}", "-d", "${DB_NAME:-mas_framework}", "-c", "CREATE EXTENSION IF NOT EXISTS vector;" ]
 
   redis:
@@ -68,7 +69,11 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=${ASYNC_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-mas_framework}
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=${JWT_SECRET:-your-default-secret-key}
       - MODEL_ORCHESTRATION_URL=http://model-orchestration:8000

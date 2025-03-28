@@ -17,12 +17,26 @@ from .exceptions import (
     PlanNotFoundError,
     TaskNotFoundError,
     InvalidDependencyError,
+    ResourceNotFoundError,
     ResourceAllocationError,
     ForecastingError,
+    TemplateNotFoundError,
+    TemplateValidationError,
+    ScenarioNotFoundError
 )
 
 # Import routers
-from .routers import plans, tasks, dependencies, forecasts, optimization
+from .routers import (
+    plans, 
+    tasks, 
+    dependencies, 
+    forecasts, 
+    optimization, 
+    resources, 
+    task_templates, 
+    dependency_types, 
+    what_if_analysis
+)
 
 # Setup logging
 logging.basicConfig(
@@ -53,6 +67,10 @@ app.include_router(tasks, prefix="/tasks", tags=["tasks"])
 app.include_router(dependencies, prefix="/dependencies", tags=["dependencies"])
 app.include_router(forecasts, prefix="/forecasts", tags=["forecasts"])
 app.include_router(optimization, prefix="/optimization", tags=["optimization"])
+app.include_router(resources, prefix="/resources", tags=["resources"])
+app.include_router(task_templates, tags=["task-templates"])
+app.include_router(dependency_types, tags=["dependency-types"])
+app.include_router(what_if_analysis, tags=["what-if-analysis"])
 
 # Exception handlers
 @app.exception_handler(PlanningSystemError)
@@ -77,6 +95,15 @@ async def plan_not_found_exception_handler(request, exc):
 async def task_not_found_exception_handler(request, exc):
     """Handle task not found errors"""
     logger.error(f"Task not found: {str(exc)}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": str(exc), "error_code": exc.error_code},
+    )
+
+@app.exception_handler(ResourceNotFoundError)
+async def resource_not_found_exception_handler(request, exc):
+    """Handle resource not found errors"""
+    logger.error(f"Resource not found: {str(exc)}")
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": str(exc), "error_code": exc.error_code},

@@ -58,17 +58,29 @@ def send_message():
         # Send the message and history to the Project Coordinator's chat endpoint
         current_app.logger.debug(f"Attempting to send message to Project Coordinator for session {session_id}.")
         # The base_url is now http://project-coordinator:8000 (no /api suffix)
-        response_data = project_client.send_chat_message(
-            message=message_content,
-            session_id=session_id,
-            user_id=user_id, # Will be None
-            history=formatted_history
-        )
+        
+        # Use asyncio.run to run the async method in a synchronous context
+        import asyncio
+        try:
+            # Run the async method in a synchronous context
+            response_data = asyncio.run(project_client.send_chat_message(
+                message=message_content,
+                session_id=session_id,
+                user_id=user_id, # Will be None
+                history=formatted_history
+            ))
+            
+            # Extract the response content and actions
+            bot_response_content = response_data.get('response', "I'm sorry, I couldn't process your request at this time. Please try again.")
+            bot_actions = response_data.get('actions', [])
+            current_app.logger.debug(f"Successfully received response from Project Coordinator for session {session_id}.")
+        except Exception as e:
+            error_type = type(e).__name__
+            current_app.logger.error(f"Error sending message to Project Coordinator for session {session_id}: {error_type}: {e}", exc_info=True)
+            bot_response_content = "Oh dear! Something unexpected happened. Please try again shortly."
+            bot_actions = []
+        
         current_app.logger.debug(f"Received response from Project Coordinator for session {session_id}.")
-
-        # Extract the response content and actions
-        bot_response_content = response_data.get('response', "I'm sorry, I couldn't process your request at this time. Please try again.")
-        bot_actions = response_data.get('actions', [])
         current_app.logger.debug(f"Bot response content: {bot_response_content[:100]}...")
         current_app.logger.debug(f"Bot actions received: {bot_actions}")
 
@@ -84,12 +96,14 @@ def send_message():
                 if action_type == 'create_project':
                     try:
                         current_app.logger.info(f"Executing create_project action: {action_data.get('name')}")
-                        project = project_client.create_project(
+                        # Use asyncio.run to run the async method in a synchronous context
+                        import asyncio
+                        project = asyncio.run(project_client.create_project(
                             name=action_data.get('name'),
                             description=action_data.get('description'),
                             status=action_data.get('status'),
                             metadata=action_data.get('metadata')
-                        )
+                        ))
                         project_id = project.get('id')
                         if project_id:
                             current_app.logger.info(f"Project created successfully: {project_id}")
@@ -97,11 +111,9 @@ def send_message():
                             updated_content += additional_info
                         else:
                              current_app.logger.warning("Create project action executed but no project ID returned.")
-                    except APIError as e:
-                        current_app.logger.error(f"API Error executing create_project action: {e.message} (Status: {e.status_code})", exc_info=True)
-                        updated_content += f"\n\n⚠️ Error creating project: {e.message}"
                     except Exception as e:
-                         current_app.logger.error(f"Unexpected error executing create_project action: {e}", exc_info=True)
+                         error_type = type(e).__name__
+                         current_app.logger.error(f"Error executing create_project action: {error_type}: {e}", exc_info=True)
                          updated_content += f"\n\n⚠️ Unexpected error creating project."
 
                 elif action_type == 'assign_agents':
@@ -110,16 +122,16 @@ def send_message():
                     if project_id and agent_ids:
                         try:
                             current_app.logger.info(f"Executing assign_agents action for project {project_id}: {agent_ids}")
+                            # Use asyncio.run to run the async method in a synchronous context
+                            import asyncio
                             for agent_id in agent_ids:
-                                project_client.assign_agent_to_project(project_id, agent_id)
+                                asyncio.run(project_client.assign_agent_to_project(project_id, agent_id))
                             current_app.logger.info(f"Agents assigned successfully for project {project_id}.")
                             additional_info = f"\n\n🤖 I've assigned {len(agent_ids)} agent(s) to your project!"
                             updated_content += additional_info
-                        except APIError as e:
-                            current_app.logger.error(f"API Error executing assign_agents action: {e.message} (Status: {e.status_code})", exc_info=True)
-                            updated_content += f"\n\n⚠️ Error assigning agents: {e.message}"
                         except Exception as e:
-                             current_app.logger.error(f"Unexpected error executing assign_agents action: {e}", exc_info=True)
+                             error_type = type(e).__name__
+                             current_app.logger.error(f"Error executing assign_agents action: {error_type}: {e}", exc_info=True)
                              updated_content += f"\n\n⚠️ Unexpected error assigning agents."
                     else:
                          current_app.logger.warning(f"Assign agents action missing project_id or agent_ids: {action_data}")

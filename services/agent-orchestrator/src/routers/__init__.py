@@ -6,3 +6,4 @@ from .state import router as state_router
 from .communications import router as communications_router
 from .human_interactions import router as human_interactions_router
 from .enhanced_communication import router as enhanced_communication_router
+from .specializations import router as specializations_router

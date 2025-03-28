@@ -272,3 +272,48 @@ class DatabaseError(ServiceError):
         details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(message, code, status.HTTP_500_INTERNAL_SERVER_ERROR, details)
+
+
+class SpecializationNotFoundError(ServiceError):
+    """
+    Exception for specialization not found errors.
+    """
+    def __init__(
+        self,
+        agent_type: str,
+        message: Optional[str] = None,
+        code: str = "specialization_not_found",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        message = message or f"Specialization for agent type {agent_type} not found"
+        details = details or {"agent_type": agent_type}
+        super().__init__(message, code, status.HTTP_404_NOT_FOUND, details)
+
+
+class InvalidRequestError(ServiceError):
+    """
+    Exception for invalid request errors.
+    """
+    def __init__(
+        self,
+        message: str = "Invalid request",
+        code: str = "invalid_request",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(message, code, status.HTTP_400_BAD_REQUEST, details)
+
+
+class PatternNotFoundError(ServiceError):
+    """
+    Exception for collaboration pattern not found errors.
+    """
+    def __init__(
+        self,
+        pattern_id: UUID,
+        message: Optional[str] = None,
+        code: str = "pattern_not_found",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        message = message or f"Collaboration pattern with ID {pattern_id} not found"
+        details = details or {"pattern_id": str(pattern_id)}
+        super().__init__(message, code, status.HTTP_404_NOT_FOUND, details)

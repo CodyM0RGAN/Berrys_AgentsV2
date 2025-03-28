@@ -137,6 +137,32 @@ class CyclicDependencyError(InvalidDependencyError):
         self.error_code = "CYCLIC_DEPENDENCY"
 
 
+class ResourceNotFoundError(PlanningSystemError):
+    """Raised when a resource is not found"""
+    
+    def __init__(
+        self,
+        resource_id: str,
+        message: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Initialize the exception.
+        
+        Args:
+            resource_id: ID of the resource that was not found
+            message: Optional custom error message
+            details: Additional error details
+        """
+        default_message = f"Resource with ID {resource_id} not found"
+        super().__init__(
+            message=message or default_message,
+            error_code="RESOURCE_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details={"resource_id": resource_id, **(details or {})},
+        )
+
+
 class ResourceAllocationError(PlanningSystemError):
     """Raised when resource allocation fails"""
     
@@ -304,4 +330,81 @@ class TaskValidationError(PlanningSystemError):
             error_code="TASK_VALIDATION_ERROR",
             status_code=status.HTTP_400_BAD_REQUEST,
             details={"validation_errors": validation_errors, **(details or {})},
+        )
+
+
+class TemplateNotFoundError(PlanningSystemError):
+    """Raised when a template is not found"""
+    
+    def __init__(
+        self,
+        template_id: str,
+        message: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Initialize the exception.
+        
+        Args:
+            template_id: ID of the template that was not found
+            message: Optional custom error message
+            details: Additional error details
+        """
+        default_message = f"Template with ID {template_id} not found"
+        super().__init__(
+            message=message or default_message,
+            error_code="TEMPLATE_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details={"template_id": template_id, **(details or {})},
+        )
+
+
+class TemplateValidationError(PlanningSystemError):
+    """Raised when a template validation fails"""
+    
+    def __init__(
+        self,
+        message: str,
+        validation_errors: list,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Initialize the exception.
+        
+        Args:
+            message: Error message
+            validation_errors: List of validation errors
+            details: Additional error details
+        """
+        super().__init__(
+            message=message,
+            error_code="TEMPLATE_VALIDATION_ERROR",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details={"validation_errors": validation_errors, **(details or {})},
+        )
+
+
+class ScenarioNotFoundError(PlanningSystemError):
+    """Raised when a what-if scenario is not found"""
+    
+    def __init__(
+        self,
+        scenario_id: str,
+        message: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        """
+        Initialize the exception.
+        
+        Args:
+            scenario_id: ID of the scenario that was not found
+            message: Optional custom error message
+            details: Additional error details
+        """
+        default_message = f"What-if scenario with ID {scenario_id} not found"
+        super().__init__(
+            message=message or default_message,
+            error_code="SCENARIO_NOT_FOUND",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details={"scenario_id": scenario_id, **(details or {})},
         )

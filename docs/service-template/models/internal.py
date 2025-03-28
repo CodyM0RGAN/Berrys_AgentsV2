@@ -32,7 +32,7 @@ class ResourceModel(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # Additional data
-    metadata = Column(JSON, nullable=True)
+    resource_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' which is reserved in SQLAlchemy
     
     # Relationships
     # Example of a one-to-many relationship
@@ -57,7 +57,7 @@ class ResourceModel(Base):
             "owner_id": self.owner_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "metadata": self.metadata or {},
+            "metadata": self.resource_metadata or {},  # Return as 'metadata' for API compatibility
         }
 
 

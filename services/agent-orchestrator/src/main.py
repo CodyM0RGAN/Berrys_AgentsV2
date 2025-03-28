@@ -18,6 +18,7 @@ from .routers import (
     state_router,
     communications_router,
     human_interactions_router,
+    specializations_router,
 )
 from .routers.executions import router as executions_router
 from .routers.enhanced_communication import router as enhanced_communication_router
@@ -95,6 +96,7 @@ app.include_router(lifecycle_router, prefix="/api/agents", tags=["lifecycle"])
 app.include_router(state_router, prefix="/api/agents", tags=["state"])
 app.include_router(communications_router, prefix="/api/agents", tags=["communications"])
 app.include_router(human_interactions_router, prefix="/api/agents", tags=["human-interactions"])
+app.include_router(specializations_router, prefix="/api/specializations", tags=["specializations"])
 app.include_router(executions_router, prefix="/api/executions", tags=["executions"])
 app.include_router(enhanced_communication_router, prefix="/api", tags=["enhanced-communication"])
 app.include_router(metrics_router, prefix="/api", tags=["metrics"])

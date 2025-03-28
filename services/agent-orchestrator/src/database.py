@@ -19,7 +19,7 @@ from shared.models.src.base import Base
 logger = logging.getLogger(__name__)
 
 # Get database URL from environment variable or construct it
-database_url = os.environ.get("DATABASE_URL") or get_async_database_url()
+database_url = os.environ.get("DATABASE_URL") or get_async_database_url(host="postgres")
 
 # Create async engine
 engine = create_async_engine(

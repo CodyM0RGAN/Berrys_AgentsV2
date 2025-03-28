@@ -475,6 +475,238 @@ class AgentCommunicationResponseData(BaseModel):
 # Create response model using shared utility
 AgentCommunicationResponse = create_data_response_model(AgentCommunicationResponseData)
 
+# Create list response model using shared utility
+AgentCommunicationListResponse = create_list_response_model(AgentCommunicationResponseData)
+
+
+class TopicSubscriptionRequest(BaseModel):
+    """
+    Model for topic subscription request.
+    """
+    agent_id: UUID
+    topic: str
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "topic": "research.quantum_computing"
+            }
+        }
+
+
+class TopicSubscriptionResponse(BaseModel):
+    """
+    Model for topic subscription response.
+    """
+    agent_id: UUID
+    topic: str
+    status: str  # "subscribed" or "unsubscribed"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "topic": "research.quantum_computing",
+                "status": "subscribed"
+            }
+        }
+
+
+class TopicPublishRequest(BaseModel):
+    """
+    Model for topic publish request.
+    """
+    agent_id: UUID
+    topic: str
+    content: Dict[str, Any]
+    message_type: str = "standard"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "topic": "research.quantum_computing",
+                "content": {
+                    "message": "New research paper on quantum algorithms",
+                    "data": {
+                        "title": "Quantum Algorithms for Machine Learning",
+                        "url": "https://example.com/papers/quantum_ml.pdf"
+                    }
+                },
+                "message_type": "research_update"
+            }
+        }
+
+
+class TopicPublishResponse(BaseModel):
+    """
+    Model for topic publish response.
+    """
+    message_id: UUID
+    agent_id: UUID
+    topic: str
+    status: str  # "published"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "message_id": "123e4567-e89b-12d3-a456-426614174000",
+                "agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "topic": "research.quantum_computing",
+                "status": "published"
+            }
+        }
+
+
+class BroadcastRequest(BaseModel):
+    """
+    Model for broadcast request.
+    """
+    from_agent_id: UUID
+    to_agent_ids: List[UUID]
+    content: Dict[str, Any]
+    message_type: str = "standard"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "from_agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "to_agent_ids": [
+                    "223e4567-e89b-12d3-a456-426614174000",
+                    "323e4567-e89b-12d3-a456-426614174000"
+                ],
+                "content": {
+                    "message": "Team update on project status",
+                    "data": {
+                        "project": "Quantum Research",
+                        "status": "In progress",
+                        "completion": 65
+                    }
+                },
+                "message_type": "status_update"
+            }
+        }
+
+
+class BroadcastResponse(BaseModel):
+    """
+    Model for broadcast response.
+    """
+    message_ids: List[UUID]
+    from_agent_id: UUID
+    to_agent_ids: List[UUID]
+    status: str  # "broadcast"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "message_ids": [
+                    "123e4567-e89b-12d3-a456-426614174000",
+                    "223e4567-e89b-12d3-a456-426614174000"
+                ],
+                "from_agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "to_agent_ids": [
+                    "223e4567-e89b-12d3-a456-426614174000",
+                    "323e4567-e89b-12d3-a456-426614174000"
+                ],
+                "status": "broadcast"
+            }
+        }
+
+
+class RequestReplyRequest(BaseModel):
+    """
+    Model for request-reply pattern.
+    """
+    from_agent_id: UUID
+    to_agent_id: UUID
+    content: Dict[str, Any]
+    timeout: float = 30.0  # Timeout in seconds
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "from_agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "to_agent_id": "223e4567-e89b-12d3-a456-426614174000",
+                "content": {
+                    "question": "What is the status of the quantum research project?",
+                    "context": {
+                        "project_id": "quantum_research_2025"
+                    }
+                },
+                "timeout": 15.0
+            }
+        }
+
+
+class RequestReplyResponse(BaseModel):
+    """
+    Model for request-reply response.
+    """
+    correlation_id: str
+    from_agent_id: UUID
+    to_agent_id: UUID
+    status: str  # "replied" or "timeout"
+    reply: Dict[str, Any]
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "correlation_id": "123e4567-e89b-12d3-a456-426614174000",
+                "from_agent_id": "123e4567-e89b-12d3-a456-426614174000",
+                "to_agent_id": "223e4567-e89b-12d3-a456-426614174000",
+                "status": "replied",
+                "reply": {
+                    "answer": "The quantum research project is 65% complete.",
+                    "details": {
+                        "estimated_completion_date": "2025-06-30",
+                        "current_phase": "Algorithm optimization"
+                    }
+                }
+            }
+        }
+
+
+class RoutingRuleRequest(BaseModel):
+    """
+    Model for routing rule request.
+    """
+    rule: Dict[str, Any]
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "rule": {
+                    "name": "research_priority_routing",
+                    "condition": {
+                        "topic": "research.*",
+                        "priority": "high"
+                    },
+                    "action": {
+                        "route_to": "senior_researcher_agent",
+                        "priority_boost": 10
+                    }
+                }
+            }
+        }
+
+
+class RoutingRuleResponse(BaseModel):
+    """
+    Model for routing rule response.
+    """
+    rule_name: str
+    status: str  # "added", "updated", "removed"
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "rule_name": "research_priority_routing",
+                "status": "added"
+            }
+        }
+
 
 class AgentStateHistoryItem(BaseEntityModel):
     """

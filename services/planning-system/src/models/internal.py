@@ -219,7 +219,7 @@ class PlanTemplateModel(StandardModel):
     version = Column(String(50), nullable=False)
     structure = Column(JSON, nullable=False)
     customization_options = Column(JSON, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    template_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' which is reserved in SQLAlchemy
     is_active = Column(Boolean, default=True)
     
     # Relationships

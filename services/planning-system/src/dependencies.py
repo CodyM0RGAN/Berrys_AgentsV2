@@ -20,8 +20,12 @@ from .services.strategic_planner import StrategicPlanner
 from .services.tactical_planner import TacticalPlanner
 from .services.forecaster import ProjectForecaster
 from .services.resource_optimizer import ResourceOptimizer
+from .services.resource_service import ResourceService
 from .services.dependency_manager import DependencyManager
 from .services.repository import PlanningRepository
+from .services.task_template_service import TaskTemplateService
+from .services.dependency_type_service import DependencyTypeService
+from .services.what_if_analysis_service import WhatIfAnalysisService
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +228,84 @@ def get_forecaster(
         confidence_interval=settings.forecasting_confidence_interval,
     )
 
+# Resource service dependency
+def get_resource_service(
+    repository: PlanningRepository = Depends(get_repository),
+) -> ResourceService:
+    """
+    Dependency for resource service.
+    
+    Args:
+        repository: Repository instance
+        
+    Returns:
+        ResourceService: Resource service instance
+    """
+    return ResourceService(repository=repository)
+
+# Task template service dependency
+def get_task_template_service(
+    repository: PlanningRepository = Depends(get_repository),
+    event_bus: EventBus = Depends(get_event_bus),
+) -> TaskTemplateService:
+    """
+    Dependency for task template service.
+    
+    Args:
+        repository: Repository instance
+        event_bus: Event bus instance
+        
+    Returns:
+        TaskTemplateService: Task template service instance
+    """
+    return TaskTemplateService(
+        repository=repository,
+        event_bus=event_bus,
+    )
+
+# Dependency type service dependency
+def get_dependency_type_service(
+    repository: PlanningRepository = Depends(get_repository),
+    event_bus: EventBus = Depends(get_event_bus),
+) -> DependencyTypeService:
+    """
+    Dependency for dependency type service.
+    
+    Args:
+        repository: Repository instance
+        event_bus: Event bus instance
+        
+    Returns:
+        DependencyTypeService: Dependency type service instance
+    """
+    return DependencyTypeService(
+        repository=repository,
+        event_bus=event_bus,
+    )
+
+# What-if analysis service dependency
+def get_what_if_analysis_service(
+    repository: PlanningRepository = Depends(get_repository),
+    event_bus: EventBus = Depends(get_event_bus),
+    forecaster: ProjectForecaster = Depends(get_forecaster),
+) -> WhatIfAnalysisService:
+    """
+    Dependency for what-if analysis service.
+    
+    Args:
+        repository: Repository instance
+        event_bus: Event bus instance
+        forecaster: Project forecaster instance
+        
+    Returns:
+        WhatIfAnalysisService: What-if analysis service instance
+    """
+    return WhatIfAnalysisService(
+        repository=repository,
+        event_bus=event_bus,
+        forecaster=forecaster,
+    )
+
 # Main service dependency
 def get_planning_service(
     db: AsyncSession = Depends(get_db),
@@ -231,6 +313,7 @@ def get_planning_service(
     tactical_planner: TacticalPlanner = Depends(get_tactical_planner),
     forecaster: ProjectForecaster = Depends(get_forecaster),
     resource_optimizer: ResourceOptimizer = Depends(get_resource_optimizer),
+    resource_service: ResourceService = Depends(get_resource_service),
     dependency_manager: DependencyManager = Depends(get_dependency_manager),
     event_bus: EventBus = Depends(get_event_bus),
     command_bus: CommandBus = Depends(get_command_bus),
@@ -245,6 +328,7 @@ def get_planning_service(
         tactical_planner: Tactical planner instance
         forecaster: Project forecaster instance
         resource_optimizer: Resource optimizer instance
+        resource_service: Resource service instance
         dependency_manager: Dependency manager instance
         event_bus: Event bus instance
         command_bus: Command bus instance
@@ -259,8 +343,12 @@ def get_planning_service(
         tactical_planner=tactical_planner,
         forecaster=forecaster,
         resource_optimizer=resource_optimizer,
+        resource_service=resource_service,
         dependency_manager=dependency_manager,
         event_bus=event_bus,
         command_bus=command_bus,
         settings=settings,
+        task_template_service=get_task_template_service(),
+        dependency_type_service=get_dependency_type_service(),
+        what_if_analysis_service=get_what_if_analysis_service(forecaster=forecaster)
     )

@@ -19,6 +19,7 @@ from ..models.internal import (
     PlanPhaseModel,
     PlanMilestoneModel,
     PlanningTaskModel,
+    ResourceModel,
     ResourceAllocationModel,
     TimelineForecastModel,
     BottleneckAnalysisModel,
@@ -36,7 +37,9 @@ from ..models.api import (
 from ..exceptions import (
     PlanNotFoundError,
     TaskNotFoundError,
-    InvalidDependencyError
+    InvalidDependencyError,
+    ResourceNotFoundError,
+    ResourceAllocationError
 )
 
 logger = logging.getLogger(__name__)
@@ -759,6 +762,493 @@ class PlanningRepository:
         
         result = await self.db.execute(query)
         return result.scalars().first()
+    
+    # Resource operations
+    
+    async def create_resource(self, resource_data: Dict[str, Any]) -> ResourceModel:
+        """
+        Create a new resource.
+        
+        Args:
+            resource_data: Resource data
+            
+        Returns:
+            ResourceModel: Created resource
+        """
+        logger.debug(f"Creating resource: {resource_data.get('name')}")
+        
+        # Create resource
+        resource = ResourceModel(**resource_data)
+        self.db.add(resource)
+        await self.db.flush()
+        await self.db.refresh(resource)
+        
+        return resource
+    
+    async def get_resource_by_id(self, resource_id: UUID) -> Optional[ResourceModel]:
+        """
+        Get a resource by ID.
+        
+        Args:
+            resource_id: Resource ID
+            
+        Returns:
+            Optional[ResourceModel]: Resource if found, None otherwise
+        """
+        logger.debug(f"Getting resource: {resource_id}")
+        
+        query = (
+            select(ResourceModel)
+            .where(ResourceModel.id == resource_id)
+        )
+        
+        result = await self.db.execute(query)
+        return result.scalars().first()
+    
+    async def list_resources(
+        self,
+        filters: Dict[str, Any],
+        pagination: Dict[str, int]
+    ) -> Tuple[List[ResourceModel], int]:
+        """
+        List resources with filtering and pagination.
+        
+        Args:
+            filters: Filters to apply
+            pagination: Pagination parameters
+            
+        Returns:
+            Tuple[List[ResourceModel], int]: List of resources and total count
+        """
+        logger.debug(f"Listing resources: {filters}")
+        
+        # Build query
+        query = select(ResourceModel)
+        
+        # Apply filters
+        if "resource_type" in filters and filters["resource_type"]:
+            query = query.where(ResourceModel.resource_type == filters["resource_type"])
+        
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total = await self.db.scalar(count_query) or 0
+        
+        # Apply pagination
+        page = pagination.get("page", 1)
+        page_size = pagination.get("page_size", 20)
+        offset = (page - 1) * page_size
+        
+        query = query.order_by(ResourceModel.created_at.desc())
+        query = query.offset(offset).limit(page_size)
+        
+        # Execute query
+        result = await self.db.execute(query)
+        resources = result.scalars().all()
+        
+        return resources, total
+    
+    async def update_resource(
+        self,
+        resource_id: UUID,
+        resource_data: Dict[str, Any]
+    ) -> Optional[ResourceModel]:
+        """
+        Update a resource.
+        
+        Args:
+            resource_id: Resource ID
+            resource_data: Resource data to update
+            
+        Returns:
+            Optional[ResourceModel]: Updated resource if found, None otherwise
+        """
+        logger.debug(f"Updating resource: {resource_id}")
+        
+        # Get current resource
+        resource = await self.get_resource_by_id(resource_id)
+        if not resource:
+            return None
+        
+        # Update resource
+        for key, value in resource_data.items():
+            if hasattr(resource, key) and value is not None:
+                setattr(resource, key, value)
+        
+        # Set updated_at timestamp
+        resource.updated_at = datetime.utcnow()
+        
+        await self.db.flush()
+        await self.db.refresh(resource)
+        
+        return resource
+    
+    async def delete_resource(self, resource_id: UUID) -> bool:
+        """
+        Delete a resource.
+        
+        Args:
+            resource_id: Resource ID
+            
+        Returns:
+            bool: True if deleted, False if not found
+        """
+        logger.debug(f"Deleting resource: {resource_id}")
+        
+        # Get resource to verify it exists
+        resource = await self.get_resource_by_id(resource_id)
+        if not resource:
+            return False
+        
+        # Delete resource
+        await self.db.execute(
+            delete(ResourceModel).where(ResourceModel.id == resource_id)
+        )
+        
+        return True
+    
+    async def get_resources_for_plan(
+        self,
+        plan_id: UUID,
+        resource_type: Optional[str] = None
+    ) -> List[ResourceModel]:
+        """
+        Get resources allocated to a plan.
+        
+        Args:
+            plan_id: Plan ID
+            resource_type: Optional resource type filter
+            
+        Returns:
+            List[ResourceModel]: Resources allocated to the plan
+        """
+        logger.debug(f"Getting resources for plan: {plan_id}")
+        
+        # Get tasks for the plan
+        tasks = await self.get_tasks_by_plan(plan_id)
+        task_ids = [task.id for task in tasks]
+        
+        if not task_ids:
+            return []
+        
+        # Get allocations for the tasks
+        query = (
+            select(ResourceAllocationModel)
+            .where(ResourceAllocationModel.task_id.in_(task_ids))
+        )
+        
+        result = await self.db.execute(query)
+        allocations = result.scalars().all()
+        
+        if not allocations:
+            return []
+        
+        # Get resources for the allocations
+        resource_ids = [allocation.resource_id for allocation in allocations]
+        
+        query = (
+            select(ResourceModel)
+            .where(ResourceModel.id.in_(resource_ids))
+        )
+        
+        if resource_type:
+            query = query.where(ResourceModel.resource_type == resource_type)
+        
+        result = await self.db.execute(query)
+        resources = result.scalars().all()
+        
+        return resources
+    
+    # Resource allocation operations
+    
+    async def create_resource_allocation(
+        self,
+        allocation_data: Dict[str, Any]
+    ) -> ResourceAllocationModel:
+        """
+        Create a new resource allocation.
+        
+        Args:
+            allocation_data: Allocation data
+            
+        Returns:
+            ResourceAllocationModel: Created allocation
+        """
+        logger.debug(f"Creating resource allocation: {allocation_data}")
+        
+        # Create allocation
+        allocation = ResourceAllocationModel(**allocation_data)
+        self.db.add(allocation)
+        await self.db.flush()
+        await self.db.refresh(allocation)
+        
+        return allocation
+    
+    async def get_resource_allocation_by_id(
+        self,
+        allocation_id: UUID
+    ) -> Optional[ResourceAllocationModel]:
+        """
+        Get a resource allocation by ID.
+        
+        Args:
+            allocation_id: Allocation ID
+            
+        Returns:
+            Optional[ResourceAllocationModel]: Allocation if found, None otherwise
+        """
+        logger.debug(f"Getting resource allocation: {allocation_id}")
+        
+        query = (
+            select(ResourceAllocationModel)
+            .where(ResourceAllocationModel.id == allocation_id)
+        )
+        
+        result = await self.db.execute(query)
+        return result.scalars().first()
+    
+    async def list_resource_allocations(
+        self,
+        filters: Dict[str, Any],
+        pagination: Dict[str, int]
+    ) -> Tuple[List[ResourceAllocationModel], int]:
+        """
+        List resource allocations with filtering and pagination.
+        
+        Args:
+            filters: Filters to apply
+            pagination: Pagination parameters
+            
+        Returns:
+            Tuple[List[ResourceAllocationModel], int]: List of allocations and total count
+        """
+        logger.debug(f"Listing resource allocations: {filters}")
+        
+        # Build query
+        query = select(ResourceAllocationModel)
+        
+        # Apply filters
+        if "task_id" in filters and filters["task_id"]:
+            query = query.where(ResourceAllocationModel.task_id == filters["task_id"])
+        
+        if "resource_id" in filters and filters["resource_id"]:
+            query = query.where(ResourceAllocationModel.resource_id == filters["resource_id"])
+        
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total = await self.db.scalar(count_query) or 0
+        
+        # Apply pagination
+        page = pagination.get("page", 1)
+        page_size = pagination.get("page_size", 20)
+        offset = (page - 1) * page_size
+        
+        query = query.order_by(ResourceAllocationModel.created_at.desc())
+        query = query.offset(offset).limit(page_size)
+        
+        # Execute query
+        result = await self.db.execute(query)
+        allocations = result.scalars().all()
+        
+        return allocations, total
+    
+    async def update_resource_allocation(
+        self,
+        allocation_id: UUID,
+        allocation_data: Dict[str, Any]
+    ) -> Optional[ResourceAllocationModel]:
+        """
+        Update a resource allocation.
+        
+        Args:
+            allocation_id: Allocation ID
+            allocation_data: Allocation data to update
+            
+        Returns:
+            Optional[ResourceAllocationModel]: Updated allocation if found, None otherwise
+        """
+        logger.debug(f"Updating resource allocation: {allocation_id}")
+        
+        # Get current allocation
+        allocation = await self.get_resource_allocation_by_id(allocation_id)
+        if not allocation:
+            return None
+        
+        # Update allocation
+        for key, value in allocation_data.items():
+            if hasattr(allocation, key) and value is not None:
+                setattr(allocation, key, value)
+        
+        # Set updated_at timestamp
+        allocation.updated_at = datetime.utcnow()
+        
+        await self.db.flush()
+        await self.db.refresh(allocation)
+        
+        return allocation
+    
+    async def delete_resource_allocation(self, allocation_id: UUID) -> bool:
+        """
+        Delete a resource allocation.
+        
+        Args:
+            allocation_id: Allocation ID
+            
+        Returns:
+            bool: True if deleted, False if not found
+        """
+        logger.debug(f"Deleting resource allocation: {allocation_id}")
+        
+        # Get allocation to verify it exists
+        allocation = await self.get_resource_allocation_by_id(allocation_id)
+        if not allocation:
+            return False
+        
+        # Delete allocation
+        await self.db.execute(
+            delete(ResourceAllocationModel).where(ResourceAllocationModel.id == allocation_id)
+        )
+        
+        return True
+    
+    async def get_resource_allocations_by_resource(
+        self,
+        resource_id: UUID
+    ) -> List[ResourceAllocationModel]:
+        """
+        Get allocations for a resource.
+        
+        Args:
+            resource_id: Resource ID
+            
+        Returns:
+            List[ResourceAllocationModel]: Allocations for the resource
+        """
+        logger.debug(f"Getting allocations for resource: {resource_id}")
+        
+        query = (
+            select(ResourceAllocationModel)
+            .where(ResourceAllocationModel.resource_id == resource_id)
+        )
+        
+        result = await self.db.execute(query)
+        return result.scalars().all()
+    
+    async def get_resource_allocations_by_task(
+        self,
+        task_id: UUID
+    ) -> List[ResourceAllocationModel]:
+        """
+        Get allocations for a task.
+        
+        Args:
+            task_id: Task ID
+            
+        Returns:
+            List[ResourceAllocationModel]: Allocations for the task
+        """
+        logger.debug(f"Getting allocations for task: {task_id}")
+        
+        query = (
+            select(ResourceAllocationModel)
+            .where(ResourceAllocationModel.task_id == task_id)
+        )
+        
+        result = await self.db.execute(query)
+        return result.scalars().all()
+    
+    async def get_resource_allocations_for_plan(
+        self,
+        plan_id: UUID
+    ) -> List[ResourceAllocationModel]:
+        """
+        Get allocations for a plan.
+        
+        Args:
+            plan_id: Plan ID
+            
+        Returns:
+            List[ResourceAllocationModel]: Allocations for the plan
+        """
+        logger.debug(f"Getting allocations for plan: {plan_id}")
+        
+        # Get tasks for the plan
+        tasks = await self.get_tasks_by_plan(plan_id)
+        task_ids = [task.id for task in tasks]
+        
+        if not task_ids:
+            return []
+        
+        # Get allocations for the tasks
+        query = (
+            select(ResourceAllocationModel)
+            .where(ResourceAllocationModel.task_id.in_(task_ids))
+        )
+        
+        result = await self.db.execute(query)
+        return result.scalars().all()
+    
+    async def delete_resource_allocations_for_resource(
+        self,
+        resource_id: UUID,
+        plan_id: Optional[UUID] = None
+    ) -> int:
+        """
+        Delete allocations for a resource.
+        
+        Args:
+            resource_id: Resource ID
+            plan_id: Optional plan ID to limit deletion to a specific plan
+            
+        Returns:
+            int: Number of allocations deleted
+        """
+        logger.debug(f"Deleting allocations for resource: {resource_id}")
+        
+        if plan_id:
+            # Get tasks for the plan
+            tasks = await self.get_tasks_by_plan(plan_id)
+            task_ids = [task.id for task in tasks]
+            
+            if not task_ids:
+                return 0
+            
+            # Delete allocations for the resource and tasks
+            stmt = (
+                delete(ResourceAllocationModel)
+                .where(
+                    ResourceAllocationModel.resource_id == resource_id,
+                    ResourceAllocationModel.task_id.in_(task_ids)
+                )
+            )
+        else:
+            # Delete all allocations for the resource
+            stmt = (
+                delete(ResourceAllocationModel)
+                .where(ResourceAllocationModel.resource_id == resource_id)
+            )
+        
+        result = await self.db.execute(stmt)
+        return result.rowcount
+    
+    async def get_tasks_by_plan(self, plan_id: UUID) -> List[PlanningTaskModel]:
+        """
+        Get tasks for a plan.
+        
+        Args:
+            plan_id: Plan ID
+            
+        Returns:
+            List[PlanningTaskModel]: Tasks for the plan
+        """
+        logger.debug(f"Getting tasks for plan: {plan_id}")
+        
+        query = (
+            select(PlanningTaskModel)
+            .where(PlanningTaskModel.plan_id == plan_id)
+        )
+        
+        result = await self.db.execute(query)
+        return result.scalars().all()
     
     # Optimization operations
     

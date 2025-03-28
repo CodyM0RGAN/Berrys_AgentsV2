@@ -148,3 +148,27 @@ from .optimization import (
     OptimizationResultResponse,
     OptimizationResult
 )
+
+from .dependency_type_info import (
+    DependencyTypeInfo
+)
+
+from .task_template import (
+    TaskTemplateBase,
+    TaskTemplateCreate,
+    TaskTemplateUpdate,
+    TaskTemplateResponseData,
+    TaskTemplateResponse,
+    TaskTemplateListResponse
+)
+
+from .what_if_analysis import (
+    WhatIfScenarioBase,
+    WhatIfScenarioCreate,
+    WhatIfScenarioUpdate,
+    WhatIfScenarioResponseData,
+    WhatIfScenarioResponse,
+    WhatIfScenarioListResponse,
+    WhatIfAnalysisResult,
+    WhatIfAnalysisResultResponse
+)

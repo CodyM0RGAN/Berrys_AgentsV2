@@ -151,6 +151,21 @@ class ServiceInternalError(ServiceError):
         super().__init__(message, service_name, 500)
 
 
+class CircuitBreakerError(Exception):
+    """Exception raised when a circuit breaker is open."""
+    
+    def __init__(self, circuit_name: str):
+        """
+        Initialize CircuitBreakerError.
+        
+        Args:
+            circuit_name: Name of the circuit breaker that is open
+        """
+        self.circuit_name = circuit_name
+        self.message = f"Circuit breaker '{circuit_name}' is open"
+        super().__init__(self.message)
+
+
 class CircuitBreakerOpenError(ServiceError):
     """Exception raised when a circuit breaker is open."""
     
@@ -183,6 +198,24 @@ class RetryExhaustedError(ServiceError):
         self.attempts = attempts
         message = message or f"All {attempts} retry attempts for operation {operation} on service {service_name} have been exhausted"
         super().__init__(message, service_name, 503)
+
+
+class MaxRetriesExceededError(Exception):
+    """Exception raised when maximum retry attempts have been exceeded."""
+    
+    def __init__(self, message: str, operation: str = None, attempts: int = None):
+        """
+        Initialize MaxRetriesExceededError.
+        
+        Args:
+            message: Error message
+            operation: Name of the operation that was being retried
+            attempts: Number of retry attempts that were made
+        """
+        self.message = message
+        self.operation = operation
+        self.attempts = attempts
+        super().__init__(message)
 
 
 class ModelValidationError(ValidationError):

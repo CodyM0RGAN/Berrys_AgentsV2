@@ -19,6 +19,9 @@ from .services.enhanced_communication_service import EnhancedCommunicationServic
 from .services.execution_service import ExecutionService
 from .services.human_interaction_service import HumanInteractionService
 from .services.communication.alerting_service import AlertingService
+from .services.agent_specialization_service import AgentSpecializationService
+from .services.collaboration_pattern_service import CollaborationPatternService
+from .services.requirement_analysis_service import RequirementAnalysisService
 
 # OAuth2 scheme for token authentication
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
@@ -355,6 +358,96 @@ async def get_execution_service(
         command_bus=command_bus,
         settings=settings,
         human_interaction_service=human_interaction_service,
+    )
+    
+    yield service
+
+
+async def get_agent_specialization_service(
+    db: AsyncSession = Depends(get_db),
+    settings: AgentOrchestratorConfig = Depends(get_settings),
+) -> AsyncGenerator[AgentSpecializationService, None]:
+    """
+    Dependency to get the agent specialization service.
+    
+    Args:
+        db: Database session
+        settings: Application settings
+        
+    Returns:
+        AgentSpecializationService: Agent specialization service instance
+    """
+    event_bus = get_event_bus()
+    command_bus = get_command_bus()
+    
+    service = AgentSpecializationService(
+        db=db,
+        event_bus=event_bus,
+        command_bus=command_bus,
+        settings=settings,
+    )
+    
+    yield service
+
+
+async def get_collaboration_pattern_service(
+    db: AsyncSession = Depends(get_db),
+    settings: AgentOrchestratorConfig = Depends(get_settings),
+    agent_specialization_service: AgentSpecializationService = Depends(get_agent_specialization_service),
+) -> AsyncGenerator[CollaborationPatternService, None]:
+    """
+    Dependency to get the collaboration pattern service.
+    
+    Args:
+        db: Database session
+        settings: Application settings
+        agent_specialization_service: Agent specialization service
+        
+    Returns:
+        CollaborationPatternService: Collaboration pattern service instance
+    """
+    event_bus = get_event_bus()
+    command_bus = get_command_bus()
+    
+    service = CollaborationPatternService(
+        db=db,
+        event_bus=event_bus,
+        command_bus=command_bus,
+        settings=settings,
+        agent_specialization_service=agent_specialization_service,
+    )
+    
+    yield service
+
+
+async def get_requirement_analysis_service(
+    db: AsyncSession = Depends(get_db),
+    settings: AgentOrchestratorConfig = Depends(get_settings),
+    agent_specialization_service: AgentSpecializationService = Depends(get_agent_specialization_service),
+    collaboration_pattern_service: CollaborationPatternService = Depends(get_collaboration_pattern_service),
+) -> AsyncGenerator[RequirementAnalysisService, None]:
+    """
+    Dependency to get the requirement analysis service.
+    
+    Args:
+        db: Database session
+        settings: Application settings
+        agent_specialization_service: Agent specialization service
+        collaboration_pattern_service: Collaboration pattern service
+        
+    Returns:
+        RequirementAnalysisService: Requirement analysis service instance
+    """
+    event_bus = get_event_bus()
+    command_bus = get_command_bus()
+    
+    service = RequirementAnalysisService(
+        db=db,
+        event_bus=event_bus,
+        command_bus=command_bus,
+        settings=settings,
+        agent_specialization_service=agent_specialization_service,
+        collaboration_pattern_service=collaboration_pattern_service,
     )
     
     yield service

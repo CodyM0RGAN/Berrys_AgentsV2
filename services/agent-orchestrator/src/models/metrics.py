@@ -96,7 +96,7 @@ class MessageMetricsModel(StandardModel):
     
     # Additional data
     routing_path = Column(JSON, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    message_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' which is reserved in SQLAlchemy
     
     # Relationships
     source_agent = relationship("AgentModel", foreign_keys=[source_agent_id])
@@ -129,7 +129,7 @@ class MessageMetricsModel(StandardModel):
             "total_time_ms": self.total_time_ms,
             "status": self.status.value if self.status else None,
             "routing_path": self.routing_path,
-            "metadata": self.metadata,
+            "metadata": self.message_metadata,  # Return as 'metadata' for API compatibility
         }
 
 
@@ -151,7 +151,7 @@ class AgentMetricsModel(StandardModel):
     average_processing_time_ms = Column(Float, nullable=True)
     
     # Additional data
-    metadata = Column(JSON, nullable=True)
+    agent_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' which is reserved in SQLAlchemy
     
     # Relationships
     agent = relationship("AgentModel", foreign_keys=[agent_id])
@@ -173,7 +173,7 @@ class AgentMetricsModel(StandardModel):
             "messages_sent": self.messages_sent,
             "messages_received": self.messages_received,
             "average_processing_time_ms": self.average_processing_time_ms,
-            "metadata": self.metadata,
+            "metadata": self.agent_metadata,  # Return as 'metadata' for API compatibility
         }
 
 
@@ -194,7 +194,7 @@ class TopicMetricsModel(StandardModel):
     subscriber_count = Column(Integer, nullable=False, default=0)
     
     # Additional data
-    metadata = Column(JSON, nullable=True)
+    topic_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' which is reserved in SQLAlchemy
     
     def __repr__(self):
         return f"<TopicMetrics(id={self.id}, topic='{self.topic}', timestamp='{self.timestamp}')>"
@@ -212,7 +212,7 @@ class TopicMetricsModel(StandardModel):
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "message_count": self.message_count,
             "subscriber_count": self.subscriber_count,
-            "metadata": self.metadata,
+            "metadata": self.topic_metadata,  # Return as 'metadata' for API compatibility
         }
 
 
@@ -237,7 +237,7 @@ class AlertConfigurationModel(StandardModel):
     notification_channels = Column(JSON, nullable=True)
     
     # Additional data
-    metadata = Column(JSON, nullable=True)
+    alert_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' which is reserved in SQLAlchemy
     
     # Relationships
     alert_history = relationship("AlertHistoryModel", back_populates="alert_configuration", cascade="all, delete-orphan")
@@ -264,7 +264,7 @@ class AlertConfigurationModel(StandardModel):
             "notification_channels": self.notification_channels,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "metadata": self.metadata,
+            "metadata": self.alert_metadata,  # Return as 'metadata' for API compatibility
         }
 
 
@@ -288,7 +288,7 @@ class AlertHistoryModel(StandardModel):
     acknowledged_at = Column(DateTime(timezone=True), nullable=True)
     
     # Additional data
-    metadata = Column(JSON, nullable=True)
+    history_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' which is reserved in SQLAlchemy
     
     # Relationships
     alert_configuration = relationship("AlertConfigurationModel", back_populates="alert_history")
@@ -312,5 +312,5 @@ class AlertHistoryModel(StandardModel):
             "acknowledged": self.acknowledged,
             "acknowledged_by": str(self.acknowledged_by) if self.acknowledged_by else None,
             "acknowledged_at": self.acknowledged_at.isoformat() if self.acknowledged_at else None,
-            "metadata": self.metadata,
+            "metadata": self.history_metadata,  # Return as 'metadata' for API compatibility
         }

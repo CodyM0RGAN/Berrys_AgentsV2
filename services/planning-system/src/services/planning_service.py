@@ -43,6 +43,7 @@ from .strategic_planner import StrategicPlanner
 from .tactical_planner import TacticalPlanner
 from .forecaster import ProjectForecaster
 from .resource_optimizer import ResourceOptimizer
+from .resource_service import ResourceService
 from .dependency_manager import DependencyManager
 
 logger = logging.getLogger(__name__)
@@ -62,10 +63,14 @@ class PlanningService:
         tactical_planner: TacticalPlanner,
         forecaster: ProjectForecaster,
         resource_optimizer: ResourceOptimizer,
+        resource_service: ResourceService,
         dependency_manager: DependencyManager,
         event_bus: EventBus,
         command_bus: CommandBus,
         settings: Settings,
+        task_template_service: Optional["TaskTemplateService"] = None,
+        dependency_type_service: Optional["DependencyTypeService"] = None,
+        what_if_analysis_service: Optional["WhatIfAnalysisService"] = None,
     ):
         """
         Initialize the planning service.
@@ -76,17 +81,25 @@ class PlanningService:
             tactical_planner: Tactical planner component
             forecaster: Project forecaster component
             resource_optimizer: Resource optimizer component
+            resource_service: Resource service component
             dependency_manager: Dependency manager component
             event_bus: Event bus
             command_bus: Command bus
             settings: Application settings
+            task_template_service: Optional task template service component
+            dependency_type_service: Optional dependency type service component
+            what_if_analysis_service: Optional what-if analysis service component
         """
         # Store components
         self.strategic_planner = strategic_planner
         self.tactical_planner = tactical_planner
         self.forecaster = forecaster
         self.resource_optimizer = resource_optimizer
+        self.resource_service = resource_service
         self.dependency_manager = dependency_manager
+        self.task_template_service = task_template_service
+        self.dependency_type_service = dependency_type_service
+        self.what_if_analysis_service = what_if_analysis_service
         
         # Store dependencies
         self.db = db

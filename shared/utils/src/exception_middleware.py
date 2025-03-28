@@ -28,17 +28,18 @@ from starlette.status import (
 )
 
 from shared.utils.src.exceptions import (
-    AuthenticationError,
-    AuthorizationError,
-    BadRequestError,
-    BaseServiceException,
     CircuitBreakerError,
-    ConflictError,
+    CircuitBreakerOpenError,
     DatabaseError,
-    InternalServerError,
-    ResourceNotFoundError,
+    ServiceAuthenticationError as AuthenticationError,
+    ServiceAuthorizationError as AuthorizationError,
+    ServiceBadRequestError as BadRequestError,
+    ServiceError as BaseServiceException,
+    ServiceError as ConflictError,  # Using ServiceError as a base for ConflictError
+    ServiceInternalError as InternalServerError,
+    ServiceNotFoundError as ResourceNotFoundError,
     ServiceUnavailableError,
-    TimeoutError,
+    ServiceTimeoutError as TimeoutError,
     ValidationError as ServiceValidationError,
 )
 from shared.utils.src.request_id import get_request_id
@@ -130,69 +131,75 @@ def exception_to_http_response(
     
     elif isinstance(exception, ServiceValidationError):
         status_code = HTTP_422_UNPROCESSABLE_ENTITY
-        code = exception.code or "VALIDATION_ERROR"
+        code = getattr(exception, 'code', "VALIDATION_ERROR")
         message = exception.message
         details = {"validation_errors": exception.validation_errors}
     
     elif isinstance(exception, ResourceNotFoundError):
         status_code = HTTP_404_NOT_FOUND
-        code = exception.code or "RESOURCE_NOT_FOUND"
+        code = getattr(exception, 'code', "RESOURCE_NOT_FOUND")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name, "resource_type": exception.resource_type, "resource_id": exception.resource_id})
     
     elif isinstance(exception, AuthenticationError):
         status_code = HTTP_401_UNAUTHORIZED
-        code = exception.code or "AUTHENTICATION_ERROR"
+        code = getattr(exception, 'code', "AUTHENTICATION_ERROR")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name})
     
     elif isinstance(exception, AuthorizationError):
         status_code = HTTP_403_FORBIDDEN
-        code = exception.code or "AUTHORIZATION_ERROR"
+        code = getattr(exception, 'code', "AUTHORIZATION_ERROR")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name})
     
     elif isinstance(exception, ConflictError):
         status_code = HTTP_409_CONFLICT
-        code = exception.code or "CONFLICT_ERROR"
+        code = getattr(exception, 'code', "CONFLICT_ERROR")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name})
     
     elif isinstance(exception, CircuitBreakerError):
         status_code = HTTP_503_SERVICE_UNAVAILABLE
-        code = exception.code or "CIRCUIT_BREAKER_OPEN"
+        code = "CIRCUIT_BREAKER_OPEN"
         message = exception.message
-        details = exception.details
+        details = {"circuit_name": exception.circuit_name}
+    
+    elif isinstance(exception, CircuitBreakerOpenError):
+        status_code = HTTP_503_SERVICE_UNAVAILABLE
+        code = getattr(exception, 'code', "CIRCUIT_BREAKER_OPEN")
+        message = exception.message
+        details = getattr(exception, 'details', {"service_name": exception.service_name})
     
     elif isinstance(exception, ServiceUnavailableError):
         status_code = HTTP_503_SERVICE_UNAVAILABLE
-        code = exception.code or "SERVICE_UNAVAILABLE"
+        code = getattr(exception, 'code', "SERVICE_UNAVAILABLE")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name})
     
     elif isinstance(exception, TimeoutError):
         status_code = HTTP_503_SERVICE_UNAVAILABLE
-        code = exception.code or "TIMEOUT_ERROR"
+        code = getattr(exception, 'code', "TIMEOUT_ERROR")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name})
     
     elif isinstance(exception, DatabaseError):
         status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        code = exception.code or "DATABASE_ERROR"
+        code = getattr(exception, 'code', "DATABASE_ERROR")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"operation": exception.operation, "table": exception.table})
     
     elif isinstance(exception, BadRequestError):
         status_code = HTTP_400_BAD_REQUEST
-        code = exception.code or "BAD_REQUEST"
+        code = getattr(exception, 'code', "BAD_REQUEST")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name, "validation_errors": getattr(exception, 'validation_errors', {})})
     
     elif isinstance(exception, BaseServiceException):
         status_code = HTTP_500_INTERNAL_SERVER_ERROR
-        code = exception.code or "INTERNAL_SERVER_ERROR"
+        code = getattr(exception, 'code', "INTERNAL_SERVER_ERROR")
         message = exception.message
-        details = exception.details
+        details = getattr(exception, 'details', {"service_name": exception.service_name})
     
     else:
         status_code = HTTP_500_INTERNAL_SERVER_ERROR
@@ -310,6 +317,7 @@ def add_exception_handlers(
     app.add_exception_handler(AuthorizationError, create_exception_handler(AuthorizationError))
     app.add_exception_handler(ConflictError, create_exception_handler(ConflictError))
     app.add_exception_handler(CircuitBreakerError, create_exception_handler(CircuitBreakerError))
+    app.add_exception_handler(CircuitBreakerOpenError, create_exception_handler(CircuitBreakerOpenError))
     app.add_exception_handler(ServiceUnavailableError, create_exception_handler(ServiceUnavailableError))
     app.add_exception_handler(TimeoutError, create_exception_handler(TimeoutError))
     app.add_exception_handler(DatabaseError, create_exception_handler(DatabaseError))

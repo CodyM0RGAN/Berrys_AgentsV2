@@ -12,8 +12,7 @@ from contextvars import ContextVar
 from typing import Any, Callable, Dict, Optional, Union
 
 from fastapi import FastAPI, Request, Response
-from fastapi.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.base import RequestResponseEndpoint
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
 # Set up logger

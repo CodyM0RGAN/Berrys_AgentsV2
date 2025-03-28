@@ -99,7 +99,9 @@ The implementation plan has been revised to prioritize core service workflows be
    - The service has been refactored into smaller, more manageable modules
    - Template-based planning, methodology-driven planning, and AI-assisted plan generation are now available
    - Timeline forecasting and bottleneck analysis have been implemented
-   - See [Planning System Enhancement Plan](developer-guides/service-development/planning-system-enhancement-plan.md) and [Planning System High-Level Capabilities Implementation](developer-guides/service-development/planning-system-high-level-capabilities-implementation.md) for details
+   - Resource allocation planning has been completed with resource management, allocation, and utilization analysis
+   - Task templates, dependency type management, and what-if analysis have been implemented
+   - See [Planning System Enhancement Plan](developer-guides/service-development/planning-system-enhancement-plan.md), [Planning System High-Level Capabilities Implementation](developer-guides/service-development/planning-system-high-level-capabilities-implementation.md), [Resource Allocation Planning Implementation](developer-guides/service-development/resource-allocation-planning-implementation.md), and [Planning System Enhancement Implementation](developer-guides/service-development/planning-system-enhancement-implementation.md) for details
 
 2. **Agent Generation Engine Enhancement**
    - See [Agent Generation Engine Enhancement Plan](developer-guides/service-development/agent-generation-engine-enhancement-plan.md) for details
@@ -197,8 +199,9 @@ See [Error Handling Best Practices](docs/developer-guides/service-development/er
 ## Common Pitfalls
 
 1. **SQLAlchemy Reserved Names**
-   - Never use `metadata` as a column name
-   - Use entity-specific prefixes for metadata columns (e.g., `project_metadata`)
+   - Never use `metadata` as a column name (it's a reserved name in SQLAlchemy)
+   - Use entity-specific prefixes for metadata columns (e.g., `project_metadata`, `template_metadata`, `model_metadata`)
+   - Other examples of entity-specific metadata fields: `message_metadata`, `agent_metadata`, `topic_metadata`, `alert_metadata`, `history_metadata`
 
 2. **Table Naming Conventions**
    - Use singular table names throughout the project
@@ -215,7 +218,31 @@ See [Error Handling Best Practices](docs/developer-guides/service-development/er
    - Handle metadata fields appropriately
    - Validate input before transformation
 
-5. **Model Mismatches Between Services**
+5. **Async/Sync Mismatches in Web Dashboard**
+   - Flask is synchronous but many service clients use async methods
+   - Use `asyncio.run()` to run async methods in synchronous Flask routes:
+     ```python
+     # Before (will fail)
+     response_data = project_client.send_chat_message(...)
+     
+     # After (correct approach)
+     import asyncio
+     response_data = asyncio.run(project_client.send_chat_message(...))
+     ```
+   - Be careful with nested async calls in synchronous contexts
+   - Consider using a separate thread for long-running async operations
+
+6. **Circular Import Issues**
+   - Avoid circular dependencies between modules
+   - Common in large projects with complex module relationships
+   - Solutions:
+     - Move shared imports to a common module
+     - Use lazy imports (import inside functions)
+     - Use dependency injection
+     - Restructure modules to have a clear hierarchy
+   - Watch for symptoms like `ImportError: cannot import name X from partially initialized module Y`
+
+7. **Model Mismatches Between Services**
    - Web Dashboard might include fields not expected by Project Coordinator
    - Different services might have different validation rules for the same fields
    - Pay attention to optional vs. required fields across service boundaries

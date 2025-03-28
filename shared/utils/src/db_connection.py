@@ -25,6 +25,10 @@ def get_database_name() -> str:
     Returns:
         str: The database name for the current environment
     """
+    # Check if DB_NAME is set in environment variables
+    if "DB_NAME" in os.environ:
+        return os.environ["DB_NAME"]
+    
     env = get_environment()
     
     if env == "PRODUCTION":

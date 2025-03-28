@@ -32,6 +32,9 @@ class ModelOrchestrationConfig(BaseServiceConfig):
     # Ollama
     ollama_url: str = Field("http://ollama:11434", description="Ollama API URL")
     
+    # Service URLs
+    agent_orchestrator_url: Optional[str] = Field(None, description="Agent Orchestrator service URL")
+    
     # Model configuration
     default_model: str = Field("gpt-3.5-turbo", description="Default model to use")
     default_provider: str = Field("openai", description="Default provider to use")

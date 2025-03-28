@@ -43,6 +43,7 @@ class RequestBase(BaseEntityModel):
     project_id: Optional[str] = None
     task_id: Optional[str] = None
     task_type: Optional[str] = None  # e.g., 'code_generation', 'reasoning', 'creative'
+    agent_specialization_id: Optional[str] = None # ID of the agent specialization requesting the model interaction
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 

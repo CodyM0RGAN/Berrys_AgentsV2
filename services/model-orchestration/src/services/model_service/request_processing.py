@@ -8,6 +8,7 @@ different types of model requests.
 import logging
 import time
 import uuid
+import httpx
 from typing import Optional, Tuple, Dict, Any, List
 
 from ...exceptions import (
@@ -16,6 +17,7 @@ from ...exceptions import (
     TokenLimitError,
     RequestTimeoutError,
 )
+from shared.models.src.enums import AgentType
 # Updated imports to use the correct modules
 from ...models.api import (
     ChatRequest,
@@ -117,6 +119,117 @@ class RequestProcessingMixin:
                 f"Token count {token_count} exceeds limit {token_limit} for model {model_id}"
             )
     
+    async def _get_agent_specialization(self, agent_specialization_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get agent specialization information from the Agent Orchestrator service.
+        
+        Args:
+            agent_specialization_id: Agent specialization ID
+            
+        Returns:
+            Optional[Dict[str, Any]]: Agent specialization information or None if not found
+        """
+        if not agent_specialization_id:
+            return None
+            
+        try:
+            # Get agent specialization from Agent Orchestrator
+            agent_orchestrator_url = self.settings.agent_orchestrator_url
+            if not agent_orchestrator_url:
+                logger.warning("Agent Orchestrator URL not configured, skipping specialization lookup")
+                return None
+                
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{agent_orchestrator_url}/api/specializations/{agent_specialization_id}",
+                    timeout=5.0,
+                )
+                
+                if response.status_code == 200:
+                    return response.json().get("data")
+                elif response.status_code == 404:
+                    logger.warning(f"Agent specialization {agent_specialization_id} not found")
+                    return None
+                else:
+                    logger.error(f"Error getting agent specialization: {response.text}")
+                    return None
+        except Exception as e:
+            logger.error(f"Error getting agent specialization: {str(e)}")
+            return None
+    
+    async def _enhance_request_with_specialization(self, request: Any) -> None:
+        """
+        Enhance a request with agent specialization information.
+        
+        Args:
+            request: Request to enhance
+        """
+        if not hasattr(request, "agent_specialization_id") or not request.agent_specialization_id:
+            return
+            
+        # Get agent specialization
+        specialization = await self._get_agent_specialization(request.agent_specialization_id)
+        if not specialization:
+            return
+            
+        # Enhance request based on specialization
+        if isinstance(request, ChatRequest):
+            # Add specialization information to system message
+            system_message_found = False
+            for message in request.messages:
+                if message.role.value == "SYSTEM":
+                    system_message_found = True
+                    # Enhance system message with specialization information
+                    skills = specialization.get("required_skills", [])
+                    responsibilities = specialization.get("responsibilities", [])
+                    knowledge_domains = specialization.get("knowledge_domains", [])
+                    
+                    specialization_info = (
+                        f"\n\nYou are specialized as a {specialization.get('agent_type', 'GENERAL')} agent with the following:\n"
+                        f"Skills: {', '.join(skills)}\n"
+                        f"Responsibilities: {', '.join(responsibilities)}\n"
+                        f"Knowledge Domains: {', '.join(knowledge_domains)}"
+                    )
+                    
+                    message.content += specialization_info
+                    break
+                    
+            # If no system message found, add one
+            if not system_message_found and request.messages:
+                from ...models.api import ChatMessage, MessageRole
+                
+                # Create specialization information
+                skills = specialization.get("required_skills", [])
+                responsibilities = specialization.get("responsibilities", [])
+                knowledge_domains = specialization.get("knowledge_domains", [])
+                
+                specialization_info = (
+                    f"You are specialized as a {specialization.get('agent_type', 'GENERAL')} agent with the following:\n"
+                    f"Skills: {', '.join(skills)}\n"
+                    f"Responsibilities: {', '.join(responsibilities)}\n"
+                    f"Knowledge Domains: {', '.join(knowledge_domains)}"
+                )
+                
+                # Add system message at the beginning
+                request.messages.insert(0, ChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=specialization_info,
+                ))
+        elif isinstance(request, CompletionRequest):
+            # Add specialization information to prompt
+            skills = specialization.get("required_skills", [])
+            responsibilities = specialization.get("responsibilities", [])
+            knowledge_domains = specialization.get("knowledge_domains", [])
+            
+            specialization_info = (
+                f"[You are specialized as a {specialization.get('agent_type', 'GENERAL')} agent with the following:\n"
+                f"Skills: {', '.join(skills)}\n"
+                f"Responsibilities: {', '.join(responsibilities)}\n"
+                f"Knowledge Domains: {', '.join(knowledge_domains)}]\n\n"
+            )
+            
+            request.prompt = specialization_info + request.prompt
+    
     async def process_chat_request(self, request: ChatRequest) -> ModelResponse:
         """
         Process a chat request.
@@ -137,6 +250,9 @@ class RequestProcessingMixin:
         request_id = str(uuid.uuid4())
         
         try:
+            # Enhance request with specialization information
+            await self._enhance_request_with_specialization(request)
+            
             # Get model and provider
             model_id, provider_name = await self._resolve_model_and_provider(request.model_id, request.provider)
             
@@ -246,6 +362,9 @@ class RequestProcessingMixin:
         request_id = str(uuid.uuid4())
         
         try:
+            # Enhance request with specialization information
+            await self._enhance_request_with_specialization(request)
+            
             # Get model and provider
             model_id, provider_name = await self._resolve_model_and_provider(request.model_id, request.provider)
             

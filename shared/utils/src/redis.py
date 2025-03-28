@@ -5,13 +5,13 @@ This module provides utilities for working with Redis, including client creation
 """
 
 import logging
-import aioredis
+import redis.asyncio as redis
 from typing import Optional, Dict, Any, List, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
 
-def get_redis_client(redis_url: str) -> aioredis.Redis:
+def get_redis_client(redis_url: str) -> redis.Redis:
     """
     Get a Redis client.
     
@@ -22,7 +22,7 @@ def get_redis_client(redis_url: str) -> aioredis.Redis:
         Redis client
     """
     try:
-        redis_client = aioredis.from_url(redis_url, decode_responses=True)
+        redis_client = redis.from_url(redis_url, decode_responses=True)
         logger.info(f"Connected to Redis at {redis_url}")
         return redis_client
     except Exception as e:
@@ -37,7 +37,7 @@ class RedisCache:
     This class provides a simple interface for caching data in Redis.
     """
     
-    def __init__(self, redis_client: aioredis.Redis, prefix: str = "cache"):
+    def __init__(self, redis_client: redis.Redis, prefix: str = "cache"):
         """
         Initialize the Redis cache.
         
@@ -160,7 +160,7 @@ class RedisLock:
     This class provides a simple interface for distributed locks using Redis.
     """
     
-    def __init__(self, redis_client: aioredis.Redis, prefix: str = "lock"):
+    def __init__(self, redis_client: redis.Redis, prefix: str = "lock"):
         """
         Initialize the Redis lock.
         
@@ -229,7 +229,7 @@ class RedisPubSub:
     This class provides a simple interface for publish-subscribe messaging using Redis.
     """
     
-    def __init__(self, redis_client: aioredis.Redis, prefix: str = "pubsub"):
+    def __init__(self, redis_client: redis.Redis, prefix: str = "pubsub"):
         """
         Initialize the Redis publish-subscribe utility.
         
@@ -257,7 +257,7 @@ class RedisPubSub:
             logger.error(f"Error publishing message to channel {channel} in Redis: {str(e)}")
             return 0
     
-    async def subscribe(self, *channels: str) -> aioredis.client.PubSub:
+    async def subscribe(self, *channels: str) -> redis.client.PubSub:
         """
         Subscribe to one or more channels.
         
@@ -276,7 +276,7 @@ class RedisPubSub:
             logger.error(f"Error subscribing to channels {channels} in Redis: {str(e)}")
             raise
     
-    async def psubscribe(self, *patterns: str) -> aioredis.client.PubSub:
+    async def psubscribe(self, *patterns: str) -> redis.client.PubSub:
         """
         Subscribe to one or more channel patterns.
         
