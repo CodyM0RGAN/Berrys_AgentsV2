@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-mas_framework}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./shared/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgvector:
+    image: ankane/pgvector:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-mas_framework}
+    command: ["psql", "-h", "postgres", "-U", "${DB_USER:-postgres}", "-d", "${DB_NAME:-mas_framework}", "-c", "CREATE EXTENSION IF NOT EXISTS vector;"]
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      - postgres
+      - redis
+
+  agent-orchestrator:
+    build:
+      context: ./services/agent-orchestrator
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - REDIS_URL=redis://redis:6379/0
+      - MODEL_ORCHESTRATION_URL=http://model-orchestration:8000
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      - postgres
+      - redis
+      - model-orchestration
+
+  planning-system:
+    build:
+      context: ./services/planning-system
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - REDIS_URL=redis://redis:6379/0
+      - MODEL_ORCHESTRATION_URL=http://model-orchestration:8000
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      - postgres
+      - redis
+      - model-orchestration
+
+  model-orchestration:
+    build:
+      context: ./services/model-orchestration
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OLLAMA_URL=http://ollama:11434
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+
+  tool-integration:
+    build:
+      context: ./services/tool-integration
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - REDIS_URL=redis://redis:6379/0
+      - MODEL_ORCHESTRATION_URL=http://model-orchestration:8000
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      - postgres
+      - redis
+      - model-orchestration
+
+  project-coordinator:
+    build:
+      context: ./services/project-coordinator
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - REDIS_URL=redis://redis:6379/0
+      - AGENT_ORCHESTRATOR_URL=http://agent-orchestrator:8000
+      - PLANNING_SYSTEM_URL=http://planning-system:8000
+      - TOOL_INTEGRATION_URL=http://tool-integration:8000
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      - postgres
+      - redis
+      - agent-orchestrator
+      - planning-system
+      - tool-integration
+
+  web-dashboard:
+    build:
+      context: ./services/web-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+      - NODE_ENV=${ENVIRONMENT:-development}
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_models:

@@ -1,0 +1,55 @@
+# Web framework
+fastapi==0.103.1
+uvicorn==0.23.2
+pydantic==2.3.0
+pydantic-settings==2.0.3
+email-validator==2.0.0.post2
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.20
+asyncpg==0.28.0
+alembic==1.12.0
+pg8000==1.30.1  # Pure Python PostgreSQL adapter instead of psycopg2-binary
+# pgvector==0.2.1  # Commented out as it may also require PostgreSQL
+
+# Authentication
+python-jose==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1
+
+# Redis and messaging
+aioredis==2.0.1
+redis==4.6.0
+
+# AI models
+# Using compatible versions to avoid dependency conflicts
+openai==1.3.0
+anthropic==0.5.0
+# ollama 0.1.0 requires httpx>=0.25.2, which conflicts with openai and anthropic
+# Using a compatible version or commenting out
+# ollama==0.1.0
+
+# Utilities
+python-dotenv==1.0.0
+# Using a version of httpx compatible with openai and anthropic
+httpx>=0.23.0,<0.25.0
+tenacity==8.2.3
+aiocache==0.12.1
+orjson==3.9.5
+pyyaml==6.0.1
+jinja2==3.1.2
+
+# Logging
+structlog==23.1.0
+
+# Testing
+pytest==7.4.0
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# Development
+black==23.7.0
+isort==5.12.0
+mypy==1.5.1
+pre-commit==3.3.3
