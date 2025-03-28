@@ -24,6 +24,7 @@ from .routers.executions import router as executions_router
 from .routers.enhanced_communication import router as enhanced_communication_router
 from .routers.metrics_router import router as metrics_router
 from .routers.alerts_router import router as alerts_router
+from .routers.collaboration_patterns import router as collaboration_patterns_router
 from shared.utils.src.feature_flags import is_feature_enabled
 
 # Configure logging
@@ -101,6 +102,7 @@ app.include_router(executions_router, prefix="/api/executions", tags=["execution
 app.include_router(enhanced_communication_router, prefix="/api", tags=["enhanced-communication"])
 app.include_router(metrics_router, prefix="/api", tags=["metrics"])
 app.include_router(alerts_router, prefix="/api", tags=["alerts"])
+app.include_router(collaboration_patterns_router, prefix="/api/patterns", tags=["collaboration-patterns"])
 
 
 # Exception handlers

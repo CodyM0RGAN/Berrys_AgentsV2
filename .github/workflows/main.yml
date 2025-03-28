@@ -1,0 +1,216 @@
+name: Main CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/templates/**'
+      - '.github/scripts/ci/**'
+      - '.github/workflows/main.yml'
+      - 'shared/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/templates/**'
+      - '.github/scripts/ci/**'
+      - '.github/workflows/main.yml'
+      - 'shared/**'
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+
+jobs:
+  trigger-service-workflows:
+    name: Trigger Service Workflows
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - agent-orchestrator
+          - api-gateway
+          - model-orchestration
+          - planning-system
+          - project-coordinator
+          - service-integration
+          - tool-integration
+          - web-dashboard
+    steps:
+      - name: Trigger service workflow
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const service = '${{ matrix.service }}';
+            
+            // Determine if this is a workflow_dispatch event
+            const isWorkflowDispatch = context.eventName === 'workflow_dispatch';
+            const deployEnvironment = isWorkflowDispatch ? context.payload.inputs.deploy_environment : null;
+            
+            // Prepare workflow dispatch inputs if needed
+            const inputs = isWorkflowDispatch ? { deploy_environment: deployEnvironment } : {};
+            
+            // Trigger the service workflow
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: `${service}.yml`,
+              ref: context.ref,
+              inputs: inputs
+            });
+            
+            console.log(`Triggered ${service} workflow${isWorkflowDispatch ? ` with environment ${deployEnvironment}` : ''}`);
+
+  collect-reports:
+    name: Collect Reports
+    needs: trigger-service-workflows
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests matplotlib
+
+      - name: Wait for service workflows to complete
+        run: |
+          echo "Waiting for service workflows to complete..."
+          sleep 300  # Wait 5 minutes for workflows to complete
+
+      - name: Download all artifacts
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Create artifacts directory
+            fs.mkdirSync('artifacts', { recursive: true });
+            
+            // List of services
+            const services = [
+              'agent-orchestrator',
+              'api-gateway',
+              'model-orchestration',
+              'planning-system',
+              'project-coordinator',
+              'service-integration',
+              'tool-integration',
+              'web-dashboard'
+            ];
+            
+            // Download artifacts for each service
+            for (const service of services) {
+              try {
+                // Get workflow runs
+                const workflowRuns = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: `${service}.yml`,
+                  branch: context.ref.replace('refs/heads/', ''),
+                  per_page: 1
+                });
+                
+                if (workflowRuns.data.workflow_runs.length === 0) {
+                  console.log(`No workflow runs found for ${service}`);
+                  continue;
+                }
+                
+                const workflowRunId = workflowRuns.data.workflow_runs[0].id;
+                
+                // Get artifacts
+                const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: workflowRunId
+                });
+                
+                // Download each artifact
+                for (const artifact of artifacts.data.artifacts) {
+                  const download = await github.rest.actions.downloadArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id,
+                    archive_format: 'zip'
+                  });
+                  
+                  // Save artifact
+                  const artifactPath = path.join('artifacts', `${artifact.name}.zip`);
+                  fs.writeFileSync(artifactPath, Buffer.from(download.data));
+                  
+                  console.log(`Downloaded artifact ${artifact.name} for ${service}`);
+                  
+                  // Extract artifact
+                  const artifactDir = path.join('artifacts', artifact.name);
+                  fs.mkdirSync(artifactDir, { recursive: true });
+                  
+                  // Use unzip command to extract
+                  const { execSync } = require('child_process');
+                  execSync(`unzip -o ${artifactPath} -d ${artifactDir}`);
+                  
+                  console.log(`Extracted artifact ${artifact.name} for ${service}`);
+                }
+              } catch (error) {
+                console.error(`Error downloading artifacts for ${service}: ${error.message}`);
+              }
+            }
+
+      - name: Generate consolidated reports
+        run: |
+          python .github/scripts/ci/test-collector.py \
+            --artifacts-dir artifacts \
+            --output-file consolidated-test-report.json \
+            --format json
+          
+          python .github/scripts/ci/test-collector.py \
+            --artifacts-dir artifacts \
+            --output-file consolidated-test-report.html \
+            --format html
+          
+          python .github/scripts/ci/test-collector.py \
+            --artifacts-dir artifacts \
+            --output-file consolidated-test-report.md \
+            --format markdown
+          
+          python .github/scripts/ci/coverage-reporter.py \
+            --artifacts-dir artifacts \
+            --output-file consolidated-coverage-report.json \
+            --format json \
+            --threshold 80
+          
+          python .github/scripts/ci/coverage-reporter.py \
+            --artifacts-dir artifacts \
+            --output-file consolidated-coverage-report.html \
+            --format html \
+            --threshold 80
+          
+          python .github/scripts/ci/coverage-reporter.py \
+            --artifacts-dir artifacts \
+            --output-file consolidated-coverage-report.md \
+            --format markdown \
+            --threshold 80
+
+      - name: Upload consolidated reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: consolidated-reports
+          path: |
+            consolidated-test-report.*
+            consolidated-coverage-report.*
+          retention-days: 30

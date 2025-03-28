@@ -1,0 +1,242 @@
+name: Agent Orchestrator CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'services/agent-orchestrator/**'
+      - 'shared/**'
+      - '.github/workflows/agent-orchestrator.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'services/agent-orchestrator/**'
+      - 'shared/**'
+      - '.github/workflows/agent-orchestrator.yml'
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - qa
+          - prod
+
+env:
+  SERVICE_NAME: agent-orchestrator
+  WORKING_DIRECTORY: services/agent-orchestrator
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/templates/build.yml
+    with:
+      service_name: ${{ env.SERVICE_NAME }}
+      python_version: ${{ env.PYTHON_VERSION }}
+      working_directory: ${{ env.WORKING_DIRECTORY }}
+      cache_dependencies: true
+
+  test:
+    name: Test
+    needs: build
+    uses: ./.github/workflows/templates/test.yml
+    with:
+      service_name: ${{ env.SERVICE_NAME }}
+      python_version: ${{ env.PYTHON_VERSION }}
+      working_directory: ${{ env.WORKING_DIRECTORY }}
+      coverage_threshold: 80
+      test_parallelism: 4
+
+  quality:
+    name: Quality
+    needs: build
+    uses: ./.github/workflows/templates/quality.yml
+    with:
+      service_name: ${{ env.SERVICE_NAME }}
+      python_version: ${{ env.PYTHON_VERSION }}
+      working_directory: ${{ env.WORKING_DIRECTORY }}
+      lint_fail_on_error: false
+      security_fail_on_error: true
+
+  report:
+    name: Generate Reports
+    needs: [test, quality]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests matplotlib
+
+      - name: Download test artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.SERVICE_NAME }}-test-results
+          path: artifacts/${{ env.SERVICE_NAME }}-test-results
+
+      - name: Download quality artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ env.SERVICE_NAME }}-quality-results
+          path: artifacts/${{ env.SERVICE_NAME }}-quality-results
+
+      - name: Generate test report
+        run: |
+          python .github/scripts/ci/test-collector.py \
+            --artifacts-dir artifacts \
+            --output-file test-report.json \
+            --format json
+          
+          python .github/scripts/ci/test-collector.py \
+            --artifacts-dir artifacts \
+            --output-file test-report.html \
+            --format html
+          
+          python .github/scripts/ci/test-collector.py \
+            --artifacts-dir artifacts \
+            --output-file test-report.md \
+            --format markdown
+
+      - name: Generate coverage report
+        run: |
+          python .github/scripts/ci/coverage-reporter.py \
+            --artifacts-dir artifacts \
+            --output-file coverage-report.json \
+            --format json \
+            --threshold 80
+          
+          python .github/scripts/ci/coverage-reporter.py \
+            --artifacts-dir artifacts \
+            --output-file coverage-report.html \
+            --format html \
+            --threshold 80
+          
+          python .github/scripts/ci/coverage-reporter.py \
+            --artifacts-dir artifacts \
+            --output-file coverage-report.md \
+            --format markdown \
+            --threshold 80
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.SERVICE_NAME }}-reports
+          path: |
+            test-report.*
+            coverage-report.*
+          retention-days: 30
+
+  deploy-dev:
+    name: Deploy to Dev
+    needs: [test, quality]
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'dev')
+    uses: ./.github/workflows/templates/deploy.yml
+    with:
+      service_name: ${{ env.SERVICE_NAME }}
+      environment: dev
+      working_directory: ${{ env.WORKING_DIRECTORY }}
+      docker_image: berrys/${{ env.SERVICE_NAME }}
+      docker_tag: ${{ github.sha }}
+      deploy_timeout: 300
+      run_migrations: true
+    secrets: inherit
+
+  deploy-qa:
+    name: Deploy to QA
+    needs: deploy-dev
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'qa')
+    uses: ./.github/workflows/templates/deploy.yml
+    with:
+      service_name: ${{ env.SERVICE_NAME }}
+      environment: qa
+      working_directory: ${{ env.WORKING_DIRECTORY }}
+      docker_image: berrys/${{ env.SERVICE_NAME }}
+      docker_tag: ${{ github.sha }}
+      deploy_timeout: 300
+      run_migrations: true
+    secrets: inherit
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: deploy-qa
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'prod')
+    uses: ./.github/workflows/templates/deploy.yml
+    with:
+      service_name: ${{ env.SERVICE_NAME }}
+      environment: prod
+      working_directory: ${{ env.WORKING_DIRECTORY }}
+      docker_image: berrys/${{ env.SERVICE_NAME }}
+      docker_tag: ${{ github.sha }}
+      deploy_timeout: 300
+      run_migrations: true
+    secrets: inherit
+
+  verify-deployment:
+    name: Verify Deployment
+    needs: [deploy-dev, deploy-qa, deploy-prod]
+    if: |
+      always() &&
+      (needs.deploy-dev.result == 'success' || needs.deploy-qa.result == 'success' || needs.deploy-prod.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Determine environment
+        id: determine-env
+        run: |
+          if [[ "${{ needs.deploy-prod.result }}" == "success" ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+            echo "service_url=https://api.berrys.ai/agent-orchestrator" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.deploy-qa.result }}" == "success" ]]; then
+            echo "environment=qa" >> $GITHUB_OUTPUT
+            echo "service_url=https://qa-api.berrys.ai/agent-orchestrator" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "service_url=https://dev-api.berrys.ai/agent-orchestrator" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify deployment
+        run: |
+          python .github/scripts/ci/deployment-verifier.py \
+            --service-url ${{ steps.determine-env.outputs.service_url }} \
+            --health-endpoint /health \
+            --timeout 300 \
+            --interval 5 \
+            --output-file deployment-verification-${{ steps.determine-env.outputs.environment }}.json \
+            --headers '{"Authorization": "Bearer ${{ secrets.API_TOKEN }}"}'
+
+      - name: Upload verification report
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.SERVICE_NAME }}-deployment-verification
+          path: deployment-verification-*.json
+          retention-days: 30

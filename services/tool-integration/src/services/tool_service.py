@@ -75,6 +75,7 @@ from .discovery import DiscoveryService, DiscoveryStrategyFactory
 from .evaluation import ToolEvaluationService
 from .integration import ToolIntegrationService, IntegrationAdapterFactory
 from .security import SecurityScanner
+from .tool_curator import ToolCuratorService, RecommendationEngine, ToolVersioningService
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,16 @@ class ToolService:
         self.evaluation_service = evaluation_service
         self.integration_service = integration_service
         self.security_scanner = security_scanner
+        
+        # Initialize the Tool Curator service
+        self.curator_service = ToolCuratorService(
+            repository=repository,
+            registry=registry,
+            discovery_service=discovery_service,
+            evaluation_service=evaluation_service,
+            recommendation_engine=RecommendationEngine(),
+            versioning_service=ToolVersioningService(),
+        )
 
     # Tool registration and management
 
@@ -1275,6 +1286,267 @@ class ToolService:
             )
         except Exception as e:
             logger.error(f"Error listing integrations: {str(e)}")
+            raise
+    
+    # Tool Curator operations
+    
+    async def recommend_tools_for_requirements(
+        self,
+        requirements: List[ToolRequirement],
+        context: Optional[Dict[str, Any]] = None,
+        min_score: float = 0.5,
+        max_recommendations: int = 5,
+    ) -> Dict[UUID, List[Dict[str, Any]]]:
+        """
+        Recommend tools for the given requirements.
+        
+        Args:
+            requirements: List of tool requirements
+            context: Optional recommendation context
+            min_score: Minimum score for a tool to be recommended
+            max_recommendations: Maximum number of recommendations per requirement
+            
+        Returns:
+            Dict[UUID, List[Dict[str, Any]]]: Recommendations by requirement ID
+        """
+        logger.info(f"Recommending tools for {len(requirements)} requirements")
+        
+        try:
+            # Get recommendations from curator service
+            recommendations_by_requirement = await self.curator_service.recommend_tools_for_requirements(
+                requirements,
+                context,
+                min_score,
+                max_recommendations,
+            )
+            
+            # Convert to serializable format
+            result = {}
+            for req_id, recommendations in recommendations_by_requirement.items():
+                result[req_id] = [rec.dict() for rec in recommendations]
+            
+            return result
+        except Exception as e:
+            logger.error(f"Error recommending tools: {str(e)}")
+            raise
+    
+    async def curate_tools_for_agent(
+        self,
+        agent_id: UUID,
+        requirements: List[ToolRequirement],
+        context: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Curate a set of tools for an agent based on requirements.
+        
+        This is a high-level method that combines discovery, evaluation, and recommendation
+        to provide a comprehensive tool curation solution.
+        
+        Args:
+            agent_id: ID of the agent
+            requirements: List of tool requirements
+            context: Optional curation context
+            
+        Returns:
+            List[Dict[str, Any]]: List of tool recommendations
+        """
+        logger.info(f"Curating tools for agent {agent_id} with {len(requirements)} requirements")
+        
+        try:
+            # Get curated tools from curator service
+            recommendations = await self.curator_service.curate_tools_for_agent(
+                agent_id,
+                requirements,
+                context,
+            )
+            
+            # Convert to serializable format
+            return [rec.dict() for rec in recommendations]
+        except Exception as e:
+            logger.error(f"Error curating tools for agent: {str(e)}")
+            raise
+    
+    async def track_tool_version(
+        self,
+        tool_id: UUID,
+        version_number: str,
+        release_notes: Optional[str] = None,
+        changes: Optional[List[str]] = None,
+        compatibility: Optional[Dict[str, Any]] = None,
+        created_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Track a new version of a tool.
+        
+        Args:
+            tool_id: ID of the tool
+            version_number: Version number (semantic versioning)
+            release_notes: Optional release notes
+            changes: Optional list of changes
+            compatibility: Optional compatibility information
+            created_by: Optional creator identifier
+            
+        Returns:
+            Dict[str, Any]: Created version
+            
+        Raises:
+            ValueError: If the version number is invalid or the tool is not found
+        """
+        logger.info(f"Tracking version {version_number} for tool {tool_id}")
+        
+        try:
+            # Track version using curator service
+            version = await self.curator_service.track_tool_version(
+                tool_id,
+                version_number,
+                status="CURRENT",
+                release_notes=release_notes,
+                changes=changes,
+                compatibility=compatibility,
+                created_by=created_by,
+            )
+            
+            # Convert to serializable format
+            return version.dict()
+        except Exception as e:
+            logger.error(f"Error tracking tool version: {str(e)}")
+            raise
+    
+    async def check_tool_compatibility(
+        self,
+        tool_id: UUID,
+        version1: str,
+        version2: str,
+    ) -> Dict[str, Any]:
+        """
+        Check compatibility between two versions of a tool.
+        
+        Args:
+            tool_id: ID of the tool
+            version1: First version string
+            version2: Second version string
+            
+        Returns:
+            Dict[str, Any]: Compatibility information
+            
+        Raises:
+            ValueError: If either version string is invalid or the tool is not found
+        """
+        logger.info(f"Checking compatibility between versions {version1} and {version2} for tool {tool_id}")
+        
+        try:
+            # Check compatibility using curator service
+            compatibility_info = await self.curator_service.check_tool_compatibility(
+                tool_id,
+                version1,
+                version2,
+            )
+            
+            return compatibility_info
+        except Exception as e:
+            logger.error(f"Error checking tool compatibility: {str(e)}")
+            raise
+    
+    async def get_tool_usage_statistics(
+        self,
+        tool_id: UUID,
+    ) -> Dict[str, Any]:
+        """
+        Get usage statistics for a tool.
+        
+        Args:
+            tool_id: ID of the tool
+            
+        Returns:
+            Dict[str, Any]: Usage statistics
+            
+        Raises:
+            ValueError: If the tool is not found
+        """
+        logger.info(f"Getting usage statistics for tool {tool_id}")
+        
+        try:
+            # Get usage statistics using curator service
+            statistics = await self.curator_service.get_tool_usage_statistics(
+                tool_id,
+            )
+            
+            # Convert to serializable format
+            return statistics.dict()
+        except Exception as e:
+            logger.error(f"Error getting tool usage statistics: {str(e)}")
+            raise
+    
+    async def evaluate_tool_capabilities(
+        self,
+        tool_id: UUID,
+        requirements: List[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        Evaluate a tool's capabilities against requirements.
+        
+        Args:
+            tool_id: ID of the tool to evaluate
+            requirements: List of requirements to evaluate against
+            
+        Returns:
+            List[Dict[str, Any]]: List of capability matches
+            
+        Raises:
+            ValueError: If the tool is not found
+        """
+        logger.info(f"Evaluating capabilities of tool {tool_id}")
+        
+        try:
+            # Evaluate capabilities using curator service
+            capability_matches = await self.curator_service.evaluate_tool_capabilities(
+                tool_id,
+                requirements,
+            )
+            
+            # Convert to serializable format
+            return [match.dict() for match in capability_matches]
+        except Exception as e:
+            logger.error(f"Error evaluating tool capabilities: {str(e)}")
+            raise
+    
+    async def perform_curation_operation(
+        self,
+        tool_id: UUID,
+        operation: str,
+        parameters: Optional[Dict[str, Any]] = None,
+        performed_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Perform a curation operation on a tool.
+        
+        Args:
+            tool_id: ID of the tool
+            operation: Curation operation to perform
+            parameters: Optional operation parameters
+            performed_by: Optional identifier of who performed the operation
+            
+        Returns:
+            Dict[str, Any]: Result of the curation operation
+            
+        Raises:
+            ValueError: If the tool is not found or the operation is invalid
+        """
+        logger.info(f"Performing curation operation {operation} on tool {tool_id}")
+        
+        try:
+            # Perform curation operation using curator service
+            result = await self.curator_service.perform_curation_operation(
+                tool_id,
+                operation,
+                parameters,
+                performed_by,
+            )
+            
+            # Convert to serializable format
+            return result.dict()
+        except Exception as e:
+            logger.error(f"Error performing curation operation: {str(e)}")
             raise
     
     # Tool execution operations

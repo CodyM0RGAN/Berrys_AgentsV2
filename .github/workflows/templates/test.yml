@@ -1,0 +1,223 @@
+name: Test Template
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+        description: 'Name of the service to test'
+      python_version:
+        required: false
+        type: string
+        default: '3.10'
+        description: 'Python version to use'
+      working_directory:
+        required: false
+        type: string
+        description: 'Directory containing the service code'
+        default: 'services/${{ inputs.service_name }}'
+      coverage_threshold:
+        required: false
+        type: number
+        default: 80
+        description: 'Minimum coverage percentage required'
+      test_parallelism:
+        required: false
+        type: number
+        default: 4
+        description: 'Number of parallel test processes'
+    outputs:
+      test_success:
+        description: 'Whether the tests passed'
+        value: ${{ jobs.test.outputs.test_success }}
+      coverage_success:
+        description: 'Whether the coverage meets the threshold'
+        value: ${{ jobs.test.outputs.coverage_success }}
+      test_summary:
+        description: 'Summary of the test results'
+        value: ${{ jobs.test.outputs.test_summary }}
+
+jobs:
+  test:
+    name: Test ${{ inputs.service_name }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    
+    outputs:
+      test_success: ${{ steps.test_results.outputs.test_success }}
+      coverage_success: ${{ steps.coverage_results.outputs.coverage_success }}
+      test_summary: ${{ steps.test_summary.outputs.summary }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            ${{ inputs.working_directory }}/requirements.txt
+            requirements.txt
+            requirements-dev.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f ../requirements-dev.txt ]; then
+            pip install -r ../requirements-dev.txt
+          fi
+          pip install pytest pytest-cov pytest-xdist
+      
+      - name: Set up test environment
+        run: |
+          echo "Setting up test environment for ${{ inputs.service_name }}..."
+          
+          # Create .coveragerc if it doesn't exist
+          if [ ! -f .coveragerc ]; then
+            cat > .coveragerc << EOF
+            [run]
+            source = src
+            omit = 
+                */tests/*
+                */__init__.py
+            
+            [report]
+            exclude_lines =
+                pragma: no cover
+                def __repr__
+                raise NotImplementedError
+                if __name__ == .__main__.:
+                pass
+                raise ImportError
+            EOF
+          fi
+          
+          # Create pytest.ini if it doesn't exist
+          if [ ! -f pytest.ini ]; then
+            cat > pytest.ini << EOF
+            [pytest]
+            testpaths = tests
+            python_files = test_*.py
+            python_classes = Test*
+            python_functions = test_*
+            EOF
+          fi
+      
+      - name: Run tests with coverage
+        id: run_tests
+        run: |
+          echo "Running tests for ${{ inputs.service_name }}..."
+          
+          # Check if tests directory exists
+          if [ -d tests ]; then
+            # Run tests with coverage
+            python -m pytest tests \
+              -v \
+              --cov=src \
+              --cov-report=xml:coverage.xml \
+              --cov-report=term \
+              --junitxml=test-results.xml \
+              -n ${{ inputs.test_parallelism }}
+            
+            TEST_EXIT_CODE=$?
+            echo "test_exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
+          else
+            echo "No tests directory found. Skipping tests."
+            echo "test_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Process test results
+        id: test_results
+        if: always()
+        run: |
+          echo "Processing test results..."
+          
+          # Check if tests passed
+          if [ "${{ steps.run_tests.outputs.test_exit_code }}" == "0" ]; then
+            echo "test_success=true" >> $GITHUB_OUTPUT
+            echo "Tests passed!"
+          else
+            echo "test_success=false" >> $GITHUB_OUTPUT
+            echo "Tests failed!"
+          fi
+      
+      - name: Check coverage
+        id: coverage_results
+        if: always() && steps.run_tests.outcome == 'success'
+        run: |
+          echo "Checking coverage for ${{ inputs.service_name }}..."
+          
+          # Check if coverage.xml exists
+          if [ -f coverage.xml ]; then
+            # Extract coverage percentage
+            COVERAGE_PCT=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib.get('line-rate', 0)) * 100)")
+            echo "coverage_percentage=$COVERAGE_PCT" >> $GITHUB_OUTPUT
+            
+            # Check if coverage meets threshold
+            if (( $(echo "$COVERAGE_PCT >= ${{ inputs.coverage_threshold }}" | bc -l) )); then
+              echo "coverage_success=true" >> $GITHUB_OUTPUT
+              echo "Coverage of $COVERAGE_PCT% meets the threshold of ${{ inputs.coverage_threshold }}%"
+            else
+              echo "coverage_success=false" >> $GITHUB_OUTPUT
+              echo "Coverage of $COVERAGE_PCT% does not meet the threshold of ${{ inputs.coverage_threshold }}%"
+            fi
+          else
+            echo "No coverage.xml found. Skipping coverage check."
+            echo "coverage_percentage=0" >> $GITHUB_OUTPUT
+            echo "coverage_success=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Generate test summary
+        id: test_summary
+        if: always()
+        run: |
+          echo "Generating test summary..."
+          
+          # Generate summary
+          SUMMARY="Test summary for ${{ inputs.service_name }}:"
+          SUMMARY="$SUMMARY\n- Tests: ${{ steps.test_results.outputs.test_success == 'true' && 'Passed' || 'Failed' }}"
+          
+          if [ -n "${{ steps.coverage_results.outputs.coverage_percentage }}" ]; then
+            SUMMARY="$SUMMARY\n- Coverage: ${{ steps.coverage_results.outputs.coverage_percentage }}% (threshold: ${{ inputs.coverage_threshold }}%)"
+            SUMMARY="$SUMMARY\n- Coverage Status: ${{ steps.coverage_results.outputs.coverage_success == 'true' && 'Passed' || 'Failed' }}"
+          else
+            SUMMARY="$SUMMARY\n- Coverage: Not measured"
+          fi
+          
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create test results directory
+        if: always()
+        run: |
+          mkdir -p test-results
+          
+          # Copy test results
+          if [ -f test-results.xml ]; then
+            cp test-results.xml test-results/
+          fi
+          
+          # Copy coverage results
+          if [ -f coverage.xml ]; then
+            cp coverage.xml test-results/
+          fi
+          
+          # Copy .pytest_cache
+          if [ -d .pytest_cache ]; then
+            cp -r .pytest_cache test-results/
+          fi
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.service_name }}-test-results
+          path: ${{ inputs.working_directory }}/test-results
+          retention-days: 7

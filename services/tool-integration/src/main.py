@@ -28,7 +28,7 @@ from .exceptions import (
 )
 
 # Import routers - these will be implemented later
-from .routers import tools, discovery, evaluation, integration, execution, mcp
+from .routers import tools, discovery, evaluation, integration, execution, mcp, tool_curator
 
 # Setup logging
 logging.basicConfig(
@@ -60,6 +60,7 @@ app.include_router(evaluation.router, prefix="/evaluation", tags=["evaluation"])
 app.include_router(integration.router, prefix="/integration", tags=["integration"])
 app.include_router(execution.router, prefix="/execution", tags=["execution"])
 app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
+app.include_router(tool_curator.router, tags=["tool-curator"])
 
 # Exception handlers
 @app.exception_handler(ToolIntegrationError)

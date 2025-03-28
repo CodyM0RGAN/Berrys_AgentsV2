@@ -1,0 +1,311 @@
+name: Deploy Template
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+        description: 'Name of the service to deploy'
+      environment:
+        required: true
+        type: string
+        description: 'Environment to deploy to (dev, qa, prod)'
+      working_directory:
+        required: false
+        type: string
+        description: 'Directory containing the service code'
+        default: 'services/${{ inputs.service_name }}'
+      docker_image:
+        required: true
+        type: string
+        description: 'Docker image name'
+      docker_tag:
+        required: true
+        type: string
+        description: 'Docker image tag'
+      deploy_timeout:
+        required: false
+        type: number
+        default: 300
+        description: 'Deployment timeout in seconds'
+      run_migrations:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to run database migrations'
+    outputs:
+      deploy_success:
+        description: 'Whether the deployment was successful'
+        value: ${{ jobs.deploy.outputs.deploy_success }}
+      service_url:
+        description: 'URL of the deployed service'
+        value: ${{ jobs.deploy.outputs.service_url }}
+      deploy_summary:
+        description: 'Summary of the deployment'
+        value: ${{ jobs.deploy.outputs.deploy_summary }}
+    secrets:
+      KUBECONFIG_DATA:
+        required: true
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
+      API_TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.service_name }} to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    outputs:
+      deploy_success: ${{ steps.deploy_results.outputs.deploy_success }}
+      service_url: ${{ steps.determine_url.outputs.service_url }}
+      deploy_summary: ${{ steps.deploy_summary.outputs.summary }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ inputs.working_directory }}
+          push: true
+          tags: ${{ inputs.docker_image }}:${{ inputs.docker_tag }},${{ inputs.docker_image }}:${{ inputs.environment }}
+          cache-from: type=registry,ref=${{ inputs.docker_image }}:buildcache
+          cache-to: type=registry,ref=${{ inputs.docker_image }}:buildcache,mode=max
+      
+      - name: Set up kubectl
+        run: |
+          echo "Setting up kubectl..."
+          
+          # Create kubeconfig directory
+          mkdir -p $HOME/.kube
+          
+          # Write kubeconfig data
+          echo "${{ secrets.KUBECONFIG_DATA }}" > kubeconfig.yaml
+      
+      - name: Determine service URL
+        id: determine_url
+        run: |
+          echo "Determining service URL for ${{ inputs.service_name }} in ${{ inputs.environment }}..."
+          
+          # Set service URL based on environment
+          if [ "${{ inputs.environment }}" == "prod" ]; then
+            if [ "${{ inputs.service_name }}" == "api-gateway" ]; then
+              echo "service_url=https://api.berrys.ai" >> $GITHUB_OUTPUT
+            elif [ "${{ inputs.service_name }}" == "web-dashboard" ]; then
+              echo "service_url=https://dashboard.berrys.ai" >> $GITHUB_OUTPUT
+            else
+              echo "service_url=https://api.berrys.ai/${{ inputs.service_name }}" >> $GITHUB_OUTPUT
+            fi
+          elif [ "${{ inputs.environment }}" == "qa" ]; then
+            if [ "${{ inputs.service_name }}" == "api-gateway" ]; then
+              echo "service_url=https://qa-api.berrys.ai" >> $GITHUB_OUTPUT
+            elif [ "${{ inputs.service_name }}" == "web-dashboard" ]; then
+              echo "service_url=https://qa-dashboard.berrys.ai" >> $GITHUB_OUTPUT
+            else
+              echo "service_url=https://qa-api.berrys.ai/${{ inputs.service_name }}" >> $GITHUB_OUTPUT
+            fi
+          else
+            if [ "${{ inputs.service_name }}" == "api-gateway" ]; then
+              echo "service_url=https://dev-api.berrys.ai" >> $GITHUB_OUTPUT
+            elif [ "${{ inputs.service_name }}" == "web-dashboard" ]; then
+              echo "service_url=https://dev-dashboard.berrys.ai" >> $GITHUB_OUTPUT
+            else
+              echo "service_url=https://dev-api.berrys.ai/${{ inputs.service_name }}" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      - name: Update deployment configuration
+        run: |
+          echo "Updating deployment configuration for ${{ inputs.service_name }} in ${{ inputs.environment }}..."
+          
+          # Create deployment directory if it doesn't exist
+          mkdir -p k8s/${{ inputs.environment }}
+          
+          # Create or update deployment.yaml
+          cat > k8s/${{ inputs.environment }}/deployment.yaml << EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ${{ inputs.service_name }}
+            namespace: berrys-${{ inputs.environment }}
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: ${{ inputs.service_name }}
+            template:
+              metadata:
+                labels:
+                  app: ${{ inputs.service_name }}
+              spec:
+                containers:
+                - name: ${{ inputs.service_name }}
+                  image: ${{ inputs.docker_image }}:${{ inputs.docker_tag }}
+                  ports:
+                  - containerPort: 8000
+                  env:
+                  - name: ENVIRONMENT
+                    value: ${{ inputs.environment }}
+          EOF
+          
+          # Create or update service.yaml
+          cat > k8s/${{ inputs.environment }}/service.yaml << EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${{ inputs.service_name }}
+            namespace: berrys-${{ inputs.environment }}
+          spec:
+            selector:
+              app: ${{ inputs.service_name }}
+            ports:
+            - port: 80
+              targetPort: 8000
+            type: ClusterIP
+          EOF
+      
+      - name: Run database migrations
+        id: migrations
+        if: ${{ inputs.run_migrations }}
+        run: |
+          echo "Running database migrations for ${{ inputs.service_name }} in ${{ inputs.environment }}..."
+          
+          # Create migration job
+          cat > k8s/${{ inputs.environment }}/migration-job.yaml << EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: ${{ inputs.service_name }}-migration-${{ github.run_id }}
+            namespace: berrys-${{ inputs.environment }}
+          spec:
+            template:
+              spec:
+                containers:
+                - name: migration
+                  image: ${{ inputs.docker_image }}:${{ inputs.docker_tag }}
+                  command: ["alembic", "upgrade", "head"]
+                  env:
+                  - name: ENVIRONMENT
+                    value: ${{ inputs.environment }}
+                restartPolicy: Never
+            backoffLimit: 3
+          EOF
+          
+          # Apply migration job
+          kubectl apply -f k8s/${{ inputs.environment }}/migration-job.yaml --kubeconfig=kubeconfig.yaml
+          
+          # Wait for migration job to complete
+          kubectl wait --for=condition=complete job/${{ inputs.service_name }}-migration-${{ github.run_id }} --namespace=berrys-${{ inputs.environment }} --timeout=${{ inputs.deploy_timeout }}s --kubeconfig=kubeconfig.yaml
+          
+          MIGRATION_EXIT_CODE=$?
+          echo "migration_exit_code=$MIGRATION_EXIT_CODE" >> $GITHUB_OUTPUT
+      
+      - name: Deploy to Kubernetes
+        id: deploy
+        run: |
+          echo "Deploying ${{ inputs.service_name }} to ${{ inputs.environment }}..."
+          
+          # Apply deployment and service
+          kubectl apply -f k8s/${{ inputs.environment }}/deployment.yaml --kubeconfig=kubeconfig.yaml
+          kubectl apply -f k8s/${{ inputs.environment }}/service.yaml --kubeconfig=kubeconfig.yaml
+          
+          # Wait for deployment to be ready
+          kubectl rollout status deployment/${{ inputs.service_name }} --namespace=berrys-${{ inputs.environment }} --timeout=${{ inputs.deploy_timeout }}s --kubeconfig=kubeconfig.yaml
+          
+          DEPLOY_EXIT_CODE=$?
+          echo "deploy_exit_code=$DEPLOY_EXIT_CODE" >> $GITHUB_OUTPUT
+      
+      - name: Verify deployment
+        id: verify
+        if: steps.deploy.outcome == 'success'
+        run: |
+          echo "Verifying deployment of ${{ inputs.service_name }} to ${{ inputs.environment }}..."
+          
+          # Get service URL
+          SERVICE_URL="${{ steps.determine_url.outputs.service_url }}"
+          
+          # Check if service is responding
+          MAX_RETRIES=10
+          RETRY_INTERVAL=5
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i of $MAX_RETRIES..."
+            if curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health" -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" | grep -q "200"; then
+              echo "Service is responding!"
+              echo "verify_success=true" >> $GITHUB_OUTPUT
+              break
+            else
+              echo "Service is not responding yet. Waiting $RETRY_INTERVAL seconds..."
+              sleep $RETRY_INTERVAL
+            fi
+            
+            if [ $i -eq $MAX_RETRIES ]; then
+              echo "Service failed to respond after $MAX_RETRIES attempts."
+              echo "verify_success=false" >> $GITHUB_OUTPUT
+            fi
+          done
+      
+      - name: Process deployment results
+        id: deploy_results
+        if: always()
+        run: |
+          echo "Processing deployment results..."
+          
+          # Check if deployment was successful
+          if [ "${{ steps.deploy.outputs.deploy_exit_code }}" == "0" ] && \
+             [ "${{ !inputs.run_migrations || steps.migrations.outputs.migration_exit_code == '0' }}" == "true" ] && \
+             [ "${{ steps.verify.outputs.verify_success }}" == "true" ]; then
+            echo "deploy_success=true" >> $GITHUB_OUTPUT
+            echo "Deployment successful!"
+          else
+            echo "deploy_success=false" >> $GITHUB_OUTPUT
+            echo "Deployment failed!"
+          fi
+      
+      - name: Generate deployment summary
+        id: deploy_summary
+        if: always()
+        run: |
+          echo "Generating deployment summary..."
+          
+          # Generate summary
+          SUMMARY="Deployment summary for ${{ inputs.service_name }} to ${{ inputs.environment }}:"
+          
+          if [ "${{ inputs.run_migrations }}" == "true" ]; then
+            SUMMARY="$SUMMARY\n- Migrations: ${{ steps.migrations.outputs.migration_exit_code == '0' && 'Succeeded' || 'Failed' }}"
+          fi
+          
+          SUMMARY="$SUMMARY\n- Deployment: ${{ steps.deploy.outputs.deploy_exit_code == '0' && 'Succeeded' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Verification: ${{ steps.verify.outputs.verify_success == 'true' && 'Succeeded' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Overall: ${{ steps.deploy_results.outputs.deploy_success == 'true' && 'Succeeded' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Service URL: ${{ steps.determine_url.outputs.service_url }}"
+          
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Rollback deployment on failure
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+          echo "Rolling back deployment of ${{ inputs.service_name }} in ${{ inputs.environment }}..."
+          
+          # Rollback to previous revision
+          kubectl rollout undo deployment/${{ inputs.service_name }} --namespace=berrys-${{ inputs.environment }} --kubeconfig=kubeconfig.yaml
+          
+          # Wait for rollback to complete
+          kubectl rollout status deployment/${{ inputs.service_name }} --namespace=berrys-${{ inputs.environment }} --timeout=60s --kubeconfig=kubeconfig.yaml

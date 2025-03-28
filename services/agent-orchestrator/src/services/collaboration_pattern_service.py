@@ -952,6 +952,280 @@ class CollaborationPatternService:
                             
                             if agent_type1.value not in collaboration_graph.get(agent_type2.value, []):
                                 if agent_type2.value not in collaboration_graph:
+                                    collaboration_graph[agent_type2.value] = []
+                                collaboration_graph[agent_type2.value].append(agent_type1.value)
+            
+            return collaboration_graph
+        except Exception as e:
+            logger.error(f"Error generating collaboration graph: {str(e)}")
+            raise DatabaseError(f"Failed to generate collaboration graph: {str(e)}")
+    
+    async def setup_communication_rules(
+        self,
+        collaboration_patterns: Dict[str, List[Dict[str, Any]]],
+        agent_ids: Dict[str, UUID],
+        communication_service,
+    ) -> None:
+        """
+        Set up communication rules based on collaboration patterns.
+        
+        Args:
+            collaboration_patterns: Collaboration patterns by agent type
+            agent_ids: Agent IDs by agent type
+            communication_service: Communication service
+            
+        Raises:
+            AgentNotFoundError: If agent not found
+            DatabaseError: If database operation fails
+        """
+        try:
+            # Set up rules for each agent type
+            for agent_type, patterns in collaboration_patterns.items():
+                # Skip if agent type not in agent_ids
+                if agent_type not in agent_ids:
+                    continue
+                
+                source_agent_id = agent_ids[agent_type]
+                
+                # Set up rules for each pattern
+                for pattern in patterns:
+                    collaborator_type = pattern.get("collaborator_type")
+                    interaction_type = pattern.get("interaction_type")
+                    
+                    # Skip if collaborator type not in agent_ids
+                    if collaborator_type not in agent_ids:
+                        continue
+                    
+                    destination_agent_id = agent_ids[collaborator_type]
+                    
+                    # Set up rule based on interaction type
+                    if interaction_type.startswith("PRIORITIZE_"):
+                        # High priority rule
+                        await self._setup_high_priority_rule(
+                            source_agent_id,
+                            destination_agent_id,
+                            interaction_type,
+                            communication_service,
+                        )
+                    elif interaction_type in ["IMPLEMENT_FEATURE", "ENSURE_QUALITY", "COORDINATE_INTEGRATION"]:
+                        # Task-based rule
+                        await self._setup_task_based_rule(
+                            source_agent_id,
+                            destination_agent_id,
+                            interaction_type,
+                            communication_service,
+                        )
+                    elif interaction_type in ["PROVIDE_DOMAIN_KNOWLEDGE", "PROVIDE_TECHNICAL_EXPERTISE"]:
+                        # Knowledge-based rule
+                        await self._setup_knowledge_based_rule(
+                            source_agent_id,
+                            destination_agent_id,
+                            interaction_type,
+                            communication_service,
+                        )
+                    else:
+                        # Default rule
+                        await self._setup_default_rule(
+                            source_agent_id,
+                            destination_agent_id,
+                            interaction_type,
+                            communication_service,
+                        )
+            
+            logger.info("Communication rules set up successfully")
+        except Exception as e:
+            logger.error(f"Error setting up communication rules: {str(e)}")
+            
+            if isinstance(e, AgentNotFoundError):
+                raise
+            
+            raise DatabaseError(f"Failed to set up communication rules: {str(e)}")
+    
+    async def _setup_high_priority_rule(
+        self,
+        source_agent_id: UUID,
+        destination_agent_id: UUID,
+        interaction_type: str,
+        communication_service,
+    ) -> None:
+        """
+        Set up a high priority rule.
+        
+        Args:
+            source_agent_id: Source agent ID
+            destination_agent_id: Destination agent ID
+            interaction_type: Interaction type
+            communication_service: Communication service
+        """
+        # Create a content-based rule for high priority messages
+        async def high_priority_condition(message: Dict[str, Any]) -> bool:
+            return (
+                message.get("source_agent_id") == str(source_agent_id) and
+                message.get("headers", {}).get("interaction_type") == interaction_type
+            )
+        
+        # Add the rule
+        await communication_service.add_content_rule(
+            high_priority_condition,
+            destination_agent_id,
+        )
+        
+        # Set up a topic for this interaction
+        topic = f"{interaction_type.lower()}_{source_agent_id}_{destination_agent_id}"
+        
+        # Subscribe the destination agent to the topic
+        await communication_service.subscribe(
+            str(destination_agent_id),
+            topic,
+        )
+        
+        logger.info(f"Set up high priority rule from {source_agent_id} to {destination_agent_id} for {interaction_type}")
+    
+    async def _setup_task_based_rule(
+        self,
+        source_agent_id: UUID,
+        destination_agent_id: UUID,
+        interaction_type: str,
+        communication_service,
+    ) -> None:
+        """
+        Set up a task-based rule.
+        
+        Args:
+            source_agent_id: Source agent ID
+            destination_agent_id: Destination agent ID
+            interaction_type: Interaction type
+            communication_service: Communication service
+        """
+        # Create a rule-based rule for task-based interactions
+        rule = {
+            "name": f"{interaction_type.lower()}_{source_agent_id}_{destination_agent_id}",
+            "conditions": [
+                {
+                    "field": "source_agent_id",
+                    "operator": "equals",
+                    "value": str(source_agent_id),
+                },
+                {
+                    "field": "headers.interaction_type",
+                    "operator": "equals",
+                    "value": interaction_type,
+                },
+                {
+                    "field": "type",
+                    "operator": "equals",
+                    "value": "task",
+                },
+            ],
+            "actions": [
+                {
+                    "type": "route",
+                    "destination": {
+                        "type": "agent",
+                        "id": str(destination_agent_id),
+                    },
+                },
+                {
+                    "type": "set_priority",
+                    "priority": 3,  # Medium-high priority
+                },
+            ],
+        }
+        
+        # Add the rule
+        await communication_service.add_rule(rule)
+        
+        logger.info(f"Set up task-based rule from {source_agent_id} to {destination_agent_id} for {interaction_type}")
+    
+    async def _setup_knowledge_based_rule(
+        self,
+        source_agent_id: UUID,
+        destination_agent_id: UUID,
+        interaction_type: str,
+        communication_service,
+    ) -> None:
+        """
+        Set up a knowledge-based rule.
+        
+        Args:
+            source_agent_id: Source agent ID
+            destination_agent_id: Destination agent ID
+            interaction_type: Interaction type
+            communication_service: Communication service
+        """
+        # Create a rule-based rule for knowledge-based interactions
+        rule = {
+            "name": f"{interaction_type.lower()}_{source_agent_id}_{destination_agent_id}",
+            "conditions": [
+                {
+                    "field": "source_agent_id",
+                    "operator": "equals",
+                    "value": str(source_agent_id),
+                },
+                {
+                    "field": "headers.interaction_type",
+                    "operator": "equals",
+                    "value": interaction_type,
+                },
+                {
+                    "field": "type",
+                    "operator": "equals",
+                    "value": "knowledge_request",
+                },
+            ],
+            "actions": [
+                {
+                    "type": "route",
+                    "destination": {
+                        "type": "agent",
+                        "id": str(destination_agent_id),
+                    },
+                },
+                {
+                    "type": "set_priority",
+                    "priority": 2,  # Medium priority
+                },
+            ],
+        }
+        
+        # Add the rule
+        await communication_service.add_rule(rule)
+        
+        logger.info(f"Set up knowledge-based rule from {source_agent_id} to {destination_agent_id} for {interaction_type}")
+    
+    async def _setup_default_rule(
+        self,
+        source_agent_id: UUID,
+        destination_agent_id: UUID,
+        interaction_type: str,
+        communication_service,
+    ) -> None:
+        """
+        Set up a default rule.
+        
+        Args:
+            source_agent_id: Source agent ID
+            destination_agent_id: Destination agent ID
+            interaction_type: Interaction type
+            communication_service: Communication service
+        """
+        # Create a rule-based rule for default interactions
+        rule = {
+            "name": f"{interaction_type.lower()}_{source_agent_id}_{destination_agent_id}",
+            "conditions": [
+                {
+                    "field": "source_agent_id",
+                    "operator": "equals",
+                    "value": str(source_agent_id),
+                },
+                {
+                    "field": "headers.interaction_type",
+                    "operator": "equals",
+                    "value": interaction_type,
+                },
+            ],
+            "actions": [
+                {
                     "type": "route",
                     "destination": {
                         "type": "agent",

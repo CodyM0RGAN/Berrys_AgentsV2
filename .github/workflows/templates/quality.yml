@@ -1,0 +1,363 @@
+name: Quality Template
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+        description: 'Name of the service to check quality'
+      python_version:
+        required: false
+        type: string
+        default: '3.10'
+        description: 'Python version to use'
+      working_directory:
+        required: false
+        type: string
+        description: 'Directory containing the service code'
+        default: 'services/${{ inputs.service_name }}'
+      lint_fail_on_error:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to fail the workflow if linting fails'
+      security_fail_on_error:
+        required: false
+        type: boolean
+        default: true
+        description: 'Whether to fail the workflow if security checks fail'
+    outputs:
+      lint_success:
+        description: 'Whether the linting passed'
+        value: ${{ jobs.quality.outputs.lint_success }}
+      security_success:
+        description: 'Whether the security checks passed'
+        value: ${{ jobs.quality.outputs.security_success }}
+      quality_summary:
+        description: 'Summary of the quality checks'
+        value: ${{ jobs.quality.outputs.quality_summary }}
+
+jobs:
+  quality:
+    name: Quality ${{ inputs.service_name }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    
+    outputs:
+      lint_success: ${{ steps.lint_results.outputs.lint_success }}
+      security_success: ${{ steps.security_results.outputs.security_success }}
+      quality_summary: ${{ steps.quality_summary.outputs.summary }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            ${{ inputs.working_directory }}/requirements.txt
+            requirements.txt
+            requirements-dev.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f ../requirements-dev.txt ]; then
+            pip install -r ../requirements-dev.txt
+          fi
+          pip install flake8 pylint black isort mypy bandit safety
+      
+      - name: Set up quality check environment
+        run: |
+          echo "Setting up quality check environment for ${{ inputs.service_name }}..."
+          
+          # Create .flake8 if it doesn't exist
+          if [ ! -f .flake8 ]; then
+            cat > .flake8 << EOF
+            [flake8]
+            max-line-length = 100
+            exclude = .git,__pycache__,build,dist
+            ignore = E203, W503
+            EOF
+          fi
+          
+          # Create .pylintrc if it doesn't exist
+          if [ ! -f .pylintrc ]; then
+            cat > .pylintrc << EOF
+            [MASTER]
+            ignore=CVS
+            ignore-patterns=
+            persistent=yes
+            load-plugins=
+            
+            [MESSAGES CONTROL]
+            disable=C0111,C0103,C0303,W0613,R0903,R0913,R0914,R0902,R0801,W0212,C0111,C0103,C0303,W0613
+            
+            [REPORTS]
+            output-format=text
+            reports=yes
+            evaluation=10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
+            
+            [BASIC]
+            good-names=i,j,k,ex,Run,_
+            
+            [FORMAT]
+            max-line-length=100
+            
+            [DESIGN]
+            max-args=10
+            max-attributes=15
+            EOF
+          fi
+          
+          # Create pyproject.toml if it doesn't exist
+          if [ ! -f pyproject.toml ]; then
+            cat > pyproject.toml << EOF
+            [tool.black]
+            line-length = 100
+            target-version = ['py310']
+            include = '\.pyi?$'
+            exclude = '''
+            /(
+                \.eggs
+              | \.git
+              | \.hg
+              | \.mypy_cache
+              | \.tox
+              | \.venv
+              | _build
+              | buck-out
+              | build
+              | dist
+            )/
+            '''
+            
+            [tool.isort]
+            profile = "black"
+            line_length = 100
+            
+            [tool.mypy]
+            python_version = "3.10"
+            warn_return_any = true
+            warn_unused_configs = true
+            disallow_untyped_defs = false
+            disallow_incomplete_defs = false
+            EOF
+          fi
+      
+      - name: Run flake8
+        id: flake8
+        run: |
+          echo "Running flake8 for ${{ inputs.service_name }}..."
+          
+          # Check if src directory exists
+          if [ -d src ]; then
+            flake8 src --output-file=flake8-results.txt || true
+            echo "flake8_exit_code=$?" >> $GITHUB_OUTPUT
+          else
+            echo "No src directory found. Skipping flake8."
+            echo "flake8_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run pylint
+        id: pylint
+        run: |
+          echo "Running pylint for ${{ inputs.service_name }}..."
+          
+          # Check if src directory exists
+          if [ -d src ]; then
+            pylint src --output=pylint-results.txt || true
+            echo "pylint_exit_code=$?" >> $GITHUB_OUTPUT
+          else
+            echo "No src directory found. Skipping pylint."
+            echo "pylint_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run black
+        id: black
+        run: |
+          echo "Running black for ${{ inputs.service_name }}..."
+          
+          # Check if src directory exists
+          if [ -d src ]; then
+            black --check src > black-results.txt || true
+            echo "black_exit_code=$?" >> $GITHUB_OUTPUT
+          else
+            echo "No src directory found. Skipping black."
+            echo "black_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run isort
+        id: isort
+        run: |
+          echo "Running isort for ${{ inputs.service_name }}..."
+          
+          # Check if src directory exists
+          if [ -d src ]; then
+            isort --check src > isort-results.txt || true
+            echo "isort_exit_code=$?" >> $GITHUB_OUTPUT
+          else
+            echo "No src directory found. Skipping isort."
+            echo "isort_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run mypy
+        id: mypy
+        run: |
+          echo "Running mypy for ${{ inputs.service_name }}..."
+          
+          # Check if src directory exists
+          if [ -d src ]; then
+            mypy src > mypy-results.txt || true
+            echo "mypy_exit_code=$?" >> $GITHUB_OUTPUT
+          else
+            echo "No src directory found. Skipping mypy."
+            echo "mypy_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run bandit
+        id: bandit
+        run: |
+          echo "Running bandit for ${{ inputs.service_name }}..."
+          
+          # Check if src directory exists
+          if [ -d src ]; then
+            bandit -r src -f json -o bandit-results.json || true
+            echo "bandit_exit_code=$?" >> $GITHUB_OUTPUT
+          else
+            echo "No src directory found. Skipping bandit."
+            echo "bandit_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run safety
+        id: safety
+        run: |
+          echo "Running safety for ${{ inputs.service_name }}..."
+          
+          # Check if requirements.txt exists
+          if [ -f requirements.txt ]; then
+            safety check -r requirements.txt --json > safety-results.json || true
+            echo "safety_exit_code=$?" >> $GITHUB_OUTPUT
+          else
+            echo "No requirements.txt found. Skipping safety."
+            echo "safety_exit_code=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Process lint results
+        id: lint_results
+        if: always()
+        run: |
+          echo "Processing lint results..."
+          
+          # Check if all lint checks passed
+          if [ "${{ steps.flake8.outputs.flake8_exit_code }}" == "0" ] && \
+             [ "${{ steps.pylint.outputs.pylint_exit_code }}" == "0" ] && \
+             [ "${{ steps.black.outputs.black_exit_code }}" == "0" ] && \
+             [ "${{ steps.isort.outputs.isort_exit_code }}" == "0" ] && \
+             [ "${{ steps.mypy.outputs.mypy_exit_code }}" == "0" ]; then
+            echo "lint_success=true" >> $GITHUB_OUTPUT
+            echo "All lint checks passed!"
+          else
+            echo "lint_success=false" >> $GITHUB_OUTPUT
+            echo "Some lint checks failed!"
+          fi
+      
+      - name: Process security results
+        id: security_results
+        if: always()
+        run: |
+          echo "Processing security results..."
+          
+          # Check if all security checks passed
+          if [ "${{ steps.bandit.outputs.bandit_exit_code }}" == "0" ] && \
+             [ "${{ steps.safety.outputs.safety_exit_code }}" == "0" ]; then
+            echo "security_success=true" >> $GITHUB_OUTPUT
+            echo "All security checks passed!"
+          else
+            echo "security_success=false" >> $GITHUB_OUTPUT
+            echo "Some security checks failed!"
+          fi
+      
+      - name: Generate quality summary
+        id: quality_summary
+        if: always()
+        run: |
+          echo "Generating quality summary..."
+          
+          # Generate summary
+          SUMMARY="Quality summary for ${{ inputs.service_name }}:"
+          SUMMARY="$SUMMARY\n- Flake8: ${{ steps.flake8.outputs.flake8_exit_code == '0' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Pylint: ${{ steps.pylint.outputs.pylint_exit_code == '0' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Black: ${{ steps.black.outputs.black_exit_code == '0' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- isort: ${{ steps.isort.outputs.isort_exit_code == '0' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- mypy: ${{ steps.mypy.outputs.mypy_exit_code == '0' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Bandit: ${{ steps.bandit.outputs.bandit_exit_code == '0' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Safety: ${{ steps.safety.outputs.safety_exit_code == '0' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Lint Status: ${{ steps.lint_results.outputs.lint_success == 'true' && 'Passed' || 'Failed' }}"
+          SUMMARY="$SUMMARY\n- Security Status: ${{ steps.security_results.outputs.security_success == 'true' && 'Passed' || 'Failed' }}"
+          
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Create quality results directory
+        if: always()
+        run: |
+          mkdir -p quality-results
+          
+          # Copy lint results
+          if [ -f flake8-results.txt ]; then
+            cp flake8-results.txt quality-results/
+          fi
+          
+          if [ -f pylint-results.txt ]; then
+            cp pylint-results.txt quality-results/
+          fi
+          
+          if [ -f black-results.txt ]; then
+            cp black-results.txt quality-results/
+          fi
+          
+          if [ -f isort-results.txt ]; then
+            cp isort-results.txt quality-results/
+          fi
+          
+          if [ -f mypy-results.txt ]; then
+            cp mypy-results.txt quality-results/
+          fi
+          
+          # Copy security results
+          if [ -f bandit-results.json ]; then
+            cp bandit-results.json quality-results/
+          fi
+          
+          if [ -f safety-results.json ]; then
+            cp safety-results.json quality-results/
+          fi
+      
+      - name: Upload quality results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.service_name }}-quality-results
+          path: ${{ inputs.working_directory }}/quality-results
+          retention-days: 7
+      
+      - name: Fail if lint checks failed
+        if: ${{ inputs.lint_fail_on_error && steps.lint_results.outputs.lint_success != 'true' }}
+        run: |
+          echo "Lint checks failed!"
+          exit 1
+      
+      - name: Fail if security checks failed
+        if: ${{ inputs.security_fail_on_error && steps.security_results.outputs.security_success != 'true' }}
+        run: |
+          echo "Security checks failed!"
+          exit 1
