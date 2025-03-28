@@ -95,7 +95,11 @@ This project uses a "draft-of-thought" documentation approach for Claude agents.
 The implementation plan has been revised to prioritize core service workflows before extensive testing. The key areas of focus are:
 
 1. **Planning System Enhancement**
-   - See [Planning System Enhancement Plan](developer-guides/service-development/planning-system-enhancement-plan.md) for details
+   - High-level planning capabilities have been implemented
+   - The service has been refactored into smaller, more manageable modules
+   - Template-based planning, methodology-driven planning, and AI-assisted plan generation are now available
+   - Timeline forecasting and bottleneck analysis have been implemented
+   - See [Planning System Enhancement Plan](developer-guides/service-development/planning-system-enhancement-plan.md) and [Planning System High-Level Capabilities Implementation](developer-guides/service-development/planning-system-high-level-capabilities-implementation.md) for details
 
 2. **Agent Generation Engine Enhancement**
    - See [Agent Generation Engine Enhancement Plan](developer-guides/service-development/agent-generation-engine-enhancement-plan.md) for details
@@ -131,6 +135,33 @@ Understanding service boundaries is essential for effective development:
 - **Planning System → Agent Orchestrator**: Uses `PlanningToAgentAdapter`
 
 Each boundary has specific transformation rules documented in [Entity Representation Alignment](docs/developer-guides/service-development/entity-representation-alignment.md).
+
+### 3. Planning System
+
+The Planning System has been enhanced with high-level planning capabilities:
+
+- **Planning Strategist**: Generates strategic plans using templates and methodologies
+- **Planning Tactician**: Breaks down plans into executable tasks
+- **Project Forecaster**: Predicts timelines and identifies bottlenecks
+
+The service has been refactored into smaller, more manageable modules following the Single Responsibility Principle:
+
+```
+services/planning-system/src/services/
+├── strategic_planning_service.py  # Main service facade
+├── plan_template_service.py       # Template management
+├── planning_methodology_service.py # Methodology management
+├── strategic_planning/            # Specialized planning services
+│   ├── __init__.py
+│   ├── helper_service.py          # Common helper methods
+│   ├── plan_creation_service.py   # Plan creation methods
+│   ├── plan_generation_service.py # AI-assisted plan generation
+│   ├── plan_optimization_service.py # Plan optimization
+│   ├── plan_forecasting_service.py # Timeline forecasting and bottleneck analysis
+│   └── methodology_application_service.py # Methodology application
+```
+
+See [Planning System High-Level Capabilities Implementation](developer-guides/service-development/planning-system-high-level-capabilities-implementation.md) for details.
 
 ## Best Practices for Claude Agents
 
