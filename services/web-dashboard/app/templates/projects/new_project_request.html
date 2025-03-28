@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-plus-circle me-2"></i> New Project Request
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('new_project') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Project Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required autofocus>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="4"
+                                required></textarea>
+                            <div class="form-text">Provide a high-level description of the project.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="project_type" class="form-label">Project Type</label>
+                            <select class="form-select" id="project_type" name="project_type" required>
+                                <option value="Software Development">Software Development</option>
+                                <option value="Data Analysis">Data Analysis</option>
+                                <option value="Content Creation">Content Creation</option>
+                                <option value="Research">Research</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <div class="form-text">Select the type of project to determine the appropriate planning
+                                methodology.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="goals" class="form-label">Project Goals</label>
+                            <textarea class="form-control" id="goals" name="goals" rows="3" required></textarea>
+                            <div class="form-text">Describe the specific goals and objectives of the project.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="constraints" class="form-label">Project Constraints</label>
+                            <textarea class="form-control" id="constraints" name="constraints" rows="3"></textarea>
+                            <div class="form-text">Describe any constraints such as budget, time, resources, etc.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="requirements" class="form-label">Project Requirements</label>
+                            <textarea class="form-control" id="requirements" name="requirements" rows="4"></textarea>
+                            <div class="form-text">List specific requirements for the project (technical, functional,
+                                etc.).</div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="Planning">Planning</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="progress" class="form-label">Progress (%)</label>
+                                <input type="number" class="form-control" id="progress" name="progress" min="0"
+                                    max="100" value="0" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Assign Agents</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent1" name="agents"
+                                            value="1">
+                                        <label class="form-check-label" for="agent1">
+                                            Code Generator
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent2" name="agents"
+                                            value="2">
+                                        <label class="form-check-label" for="agent2">
+                                            Data Analyzer
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent3" name="agents"
+                                            value="3">
+                                        <label class="form-check-label" for="agent3">
+                                            QA Tester
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent4" name="agents"
+                                            value="4">
+                                        <label class="form-check-label" for="agent4">
+                                            Documentation Writer
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="deadline" class="form-label">Deadline (Optional)</label>
+                            <input type="date" class="form-control" id="deadline" name="deadline">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority" required>
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Urgent">Urgent</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="tags" class="form-label">Tags (Optional)</label>
+                            <input type="text" class="form-control" id="tags" name="tags"
+                                placeholder="Enter tags separated by commas">
+                            <div class="form-text">Example: web, database, api</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('projects_list') }}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-2"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i> Submit Project Request
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Update progress based on status
+    document.getElementById('status').addEventListener('change', function () {
+        const status = this.value;
+        const progressInput = document.getElementById('progress');
+
+        if (status === 'Planning') {
+            progressInput.value = 0;
+        } else if (status === 'In Progress') {
+            progressInput.value = 50;
+        } else if (status === 'Completed') {
+            progressInput.value = 100;
+        }
+    });
+
+    // Validate progress value
+    document.getElementById('progress').addEventListener('input', function () {
+        const value = parseInt(this.value);
+        if (isNaN(value)) {
+            this.value = 0;
+        } else if (value < 0) {
+            this.value = 0;
+        } else if (value > 100) {
+            this.value = 100;
+        }
+    });
+</script>
+{% endblock %}

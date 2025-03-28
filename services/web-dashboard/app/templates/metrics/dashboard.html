@@ -1,0 +1,883 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Communication Metrics - Berry's Agents{% endblock %}
+
+{% block styles %}
+<!-- Chart.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css">
+<!-- D3.js for Sankey diagram -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<!-- D3-Sankey -->
+<script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<style>
+    .metrics-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .metrics-card .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        font-weight: 600;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+
+    .sankey-container {
+        height: 500px;
+        width: 100%;
+    }
+
+    .metrics-filters {
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .metrics-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .summary-card {
+        flex: 1;
+        min-width: 200px;
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    .summary-card h3 {
+        margin-top: 0;
+        font-size: 1.2rem;
+        color: #6c757d;
+    }
+
+    .summary-card .value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #0d6efd;
+    }
+
+    .summary-card .unit {
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 300px;
+    }
+
+    .loading-spinner {
+        width: 3rem;
+        height: 3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center my-4">
+        <h1>Agent Communication Hub Metrics</h1>
+        <a href="/metrics/alerts" class="btn btn-primary">
+            <i class="fas fa-bell"></i> Alerts Dashboard
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="metrics-filters">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label for="timeRange" class="form-label">Time Range</label>
+                    <select class="form-select" id="timeRange">
+                        <option value="1h">Last Hour</option>
+                        <option value="6h">Last 6 Hours</option>
+                        <option value="12h">Last 12 Hours</option>
+                        <option value="24h" selected>Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                        <option value="custom">Custom Range</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label for="agentFilter" class="form-label">Agent</label>
+                    <select class="form-select" id="agentFilter">
+                        <option value="">All Agents</option>
+                        <!-- Will be populated dynamically -->
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label for="topicFilter" class="form-label">Topic</label>
+                    <select class="form-select" id="topicFilter">
+                        <option value="">All Topics</option>
+                        <!-- Will be populated dynamically -->
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="row" id="customDateRange" style="display: none;">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="startDate" class="form-label">Start Date</label>
+                    <input type="datetime-local" class="form-control" id="startDate">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label for="endDate" class="form-label">End Date</label>
+                    <input type="datetime-local" class="form-control" id="endDate">
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <button class="btn btn-primary" id="applyFilters">Apply Filters</button>
+                <button class="btn btn-secondary" id="resetFilters">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="metrics-summary">
+        <div class="summary-card">
+            <h3>Total Messages</h3>
+            <div class="value" id="totalMessages">-</div>
+        </div>
+        <div class="summary-card">
+            <h3>Avg Processing Time</h3>
+            <div class="value" id="avgProcessingTime">-</div>
+            <div class="unit">ms</div>
+        </div>
+        <div class="summary-card">
+            <h3>Avg Queue Time</h3>
+            <div class="value" id="avgQueueTime">-</div>
+            <div class="unit">ms</div>
+        </div>
+        <div class="summary-card">
+            <h3>Avg Total Time</h3>
+            <div class="value" id="avgTotalTime">-</div>
+            <div class="unit">ms</div>
+        </div>
+    </div>
+
+    <!-- Message Flow Visualization -->
+    <div class="card metrics-card">
+        <div class="card-header">
+            Message Flow Visualization
+        </div>
+        <div class="card-body">
+            <div id="messageFlowLoading" class="loading">
+                <div class="spinner-border loading-spinner text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+            <div id="messageFlow" class="sankey-container" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Message Status Distribution -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card metrics-card">
+                <div class="card-header">
+                    Message Status Distribution
+                </div>
+                <div class="card-body">
+                    <div id="statusChartLoading" class="loading">
+                        <div class="spinner-border loading-spinner text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card metrics-card">
+                <div class="card-header">
+                    Top Topics
+                </div>
+                <div class="card-body">
+                    <div id="topicsChartLoading" class="loading">
+                        <div class="spinner-border loading-spinner text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="topicsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Activity -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card metrics-card">
+                <div class="card-header">
+                    Agent Activity
+                </div>
+                <div class="card-body">
+                    <div id="agentActivityLoading" class="loading">
+                        <div class="spinner-border loading-spinner text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="agentActivityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Topic Activity Over Time -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card metrics-card">
+                <div class="card-header">
+                    Topic Activity Over Time
+                </div>
+                <div class="card-body">
+                    <div id="topicActivityLoading" class="loading">
+                        <div class="spinner-border loading-spinner text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="topicActivityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<!-- Moment.js for date handling -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<!-- Chart.js Adapter for Moment.js -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
+
+<script>
+    // Global variables
+    let agentNames = {};
+    let topicNames = [];
+    let charts = {};
+
+    // Initialize the dashboard
+    document.addEventListener('DOMContentLoaded', function () {
+        // Set up event listeners
+        document.getElementById('timeRange').addEventListener('change', function () {
+            if (this.value === 'custom') {
+                document.getElementById('customDateRange').style.display = 'flex';
+            } else {
+                document.getElementById('customDateRange').style.display = 'none';
+            }
+        });
+
+        document.getElementById('applyFilters').addEventListener('click', loadAllData);
+        document.getElementById('resetFilters').addEventListener('click', resetFilters);
+
+        // Load initial data
+        loadAgents();
+        loadTopics();
+        loadAllData();
+    });
+
+    // Load agents for the filter dropdown
+    function loadAgents() {
+        fetch('/api/agents')
+            .then(response => response.json())
+            .then(data => {
+                const agentFilter = document.getElementById('agentFilter');
+                agentFilter.innerHTML = '<option value="">All Agents</option>';
+
+                if (data.items && data.items.length > 0) {
+                    data.items.forEach(agent => {
+                        agentNames[agent.id] = agent.name;
+                        const option = document.createElement('option');
+                        option.value = agent.id;
+                        option.textContent = agent.name;
+                        agentFilter.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error loading agents:', error);
+            });
+    }
+
+    // Load topics for the filter dropdown
+    function loadTopics() {
+        fetch('/api/metrics/topics')
+            .then(response => response.json())
+            .then(data => {
+                const topicFilter = document.getElementById('topicFilter');
+                topicFilter.innerHTML = '<option value="">All Topics</option>';
+
+                if (data && data.length > 0) {
+                    // Extract unique topics
+                    const uniqueTopics = [...new Set(data.map(item => item.topic))];
+                    topicNames = uniqueTopics;
+
+                    uniqueTopics.forEach(topic => {
+                        const option = document.createElement('option');
+                        option.value = topic;
+                        option.textContent = topic;
+                        topicFilter.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error loading topics:', error);
+            });
+    }
+
+    // Load all dashboard data
+    function loadAllData() {
+        // Show loading indicators
+        document.getElementById('messageFlowLoading').style.display = 'flex';
+        document.getElementById('statusChartLoading').style.display = 'flex';
+        document.getElementById('topicsChartLoading').style.display = 'flex';
+        document.getElementById('agentActivityLoading').style.display = 'flex';
+        document.getElementById('topicActivityLoading').style.display = 'flex';
+
+        // Hide charts
+        document.getElementById('messageFlow').style.display = 'none';
+
+        // Get filter values
+        const filters = getFilters();
+
+        // Load performance metrics
+        loadPerformanceMetrics(filters);
+
+        // Load message metrics for Sankey diagram
+        loadMessageMetrics(filters);
+
+        // Load agent metrics
+        loadAgentMetrics(filters);
+
+        // Load topic metrics
+        loadTopicMetrics(filters);
+    }
+
+    // Get filter values
+    function getFilters() {
+        const timeRange = document.getElementById('timeRange').value;
+        const agentId = document.getElementById('agentFilter').value;
+        const topic = document.getElementById('topicFilter').value;
+
+        let startTime, endTime;
+        const now = new Date();
+
+        if (timeRange === 'custom') {
+            startTime = document.getElementById('startDate').value;
+            endTime = document.getElementById('endDate').value;
+        } else {
+            endTime = now.toISOString();
+
+            if (timeRange === '1h') {
+                startTime = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+            } else if (timeRange === '6h') {
+                startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString();
+            } else if (timeRange === '12h') {
+                startTime = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
+            } else if (timeRange === '24h') {
+                startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+            } else if (timeRange === '7d') {
+                startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            } else if (timeRange === '30d') {
+                startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            }
+        }
+
+        return {
+            startTime,
+            endTime,
+            agentId,
+            topic
+        };
+    }
+
+    // Reset filters to default values
+    function resetFilters() {
+        document.getElementById('timeRange').value = '24h';
+        document.getElementById('agentFilter').value = '';
+        document.getElementById('topicFilter').value = '';
+        document.getElementById('customDateRange').style.display = 'none';
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+
+        loadAllData();
+    }
+
+    // Load performance metrics
+    function loadPerformanceMetrics(filters) {
+        const params = new URLSearchParams();
+        if (filters.startTime) params.append('start_time', filters.startTime);
+        if (filters.endTime) params.append('end_time', filters.endTime);
+
+        fetch(`/api/metrics/performance?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                // Update summary cards
+                document.getElementById('totalMessages').textContent = data.message_count.toLocaleString();
+                document.getElementById('avgProcessingTime').textContent = data.avg_processing_time_ms.toFixed(2);
+                document.getElementById('avgQueueTime').textContent = data.avg_queue_time_ms.toFixed(2);
+                document.getElementById('avgTotalTime').textContent = data.avg_total_time_ms.toFixed(2);
+
+                // Create status distribution chart
+                createStatusChart(data.status_counts);
+
+                // Create topics chart
+                createTopicsChart(data.top_topics);
+            })
+            .catch(error => {
+                console.error('Error loading performance metrics:', error);
+            });
+    }
+
+    // Load message metrics for Sankey diagram
+    function loadMessageMetrics(filters) {
+        const params = new URLSearchParams();
+        if (filters.startTime) params.append('start_time', filters.startTime);
+        if (filters.endTime) params.append('end_time', filters.endTime);
+        if (filters.agentId) {
+            params.append('source_agent_id', filters.agentId);
+            params.append('destination_agent_id', filters.agentId);
+        }
+        if (filters.topic) params.append('topic', filters.topic);
+        params.append('limit', 1000);
+
+        fetch(`/api/metrics/messages?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                createMessageFlowDiagram(data);
+            })
+            .catch(error => {
+                console.error('Error loading message metrics:', error);
+                document.getElementById('messageFlowLoading').style.display = 'none';
+            });
+    }
+
+    // Load agent metrics
+    function loadAgentMetrics(filters) {
+        const params = new URLSearchParams();
+        if (filters.startTime) params.append('start_time', filters.startTime);
+        if (filters.endTime) params.append('end_time', filters.endTime);
+        if (filters.agentId) params.append('agent_id', filters.agentId);
+        params.append('limit', 1000);
+
+        fetch(`/api/metrics/agents?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                createAgentActivityChart(data);
+            })
+            .catch(error => {
+                console.error('Error loading agent metrics:', error);
+                document.getElementById('agentActivityLoading').style.display = 'none';
+            });
+    }
+
+    // Load topic metrics
+    function loadTopicMetrics(filters) {
+        const params = new URLSearchParams();
+        if (filters.startTime) params.append('start_time', filters.startTime);
+        if (filters.endTime) params.append('end_time', filters.endTime);
+        if (filters.topic) params.append('topic', filters.topic);
+        params.append('limit', 1000);
+
+        fetch(`/api/metrics/topics?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                createTopicActivityChart(data);
+            })
+            .catch(error => {
+                console.error('Error loading topic metrics:', error);
+                document.getElementById('topicActivityLoading').style.display = 'none';
+            });
+    }
+
+    // Create status distribution chart
+    function createStatusChart(statusCounts) {
+        const ctx = document.getElementById('statusChart').getContext('2d');
+
+        // Destroy existing chart if it exists
+        if (charts.statusChart) {
+            charts.statusChart.destroy();
+        }
+
+        const labels = Object.keys(statusCounts);
+        const data = Object.values(statusCounts);
+
+        charts.statusChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        '#4e73df', // CREATED
+                        '#1cc88a', // ROUTED
+                        '#36b9cc', // DELIVERED
+                        '#f6c23e', // PROCESSED
+                        '#e74a3b'  // FAILED
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        document.getElementById('statusChartLoading').style.display = 'none';
+    }
+
+    // Create topics chart
+    function createTopicsChart(topTopics) {
+        const ctx = document.getElementById('topicsChart').getContext('2d');
+
+        // Destroy existing chart if it exists
+        if (charts.topicsChart) {
+            charts.topicsChart.destroy();
+        }
+
+        const labels = topTopics.map(item => item.topic);
+        const data = topTopics.map(item => item.count);
+
+        charts.topicsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Message Count',
+                    data: data,
+                    backgroundColor: '#4e73df',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Message Count'
+                        }
+                    }
+                }
+            }
+        });
+
+        document.getElementById('topicsChartLoading').style.display = 'none';
+    }
+
+    // Create agent activity chart
+    function createAgentActivityChart(agentMetrics) {
+        const ctx = document.getElementById('agentActivityChart').getContext('2d');
+
+        // Destroy existing chart if it exists
+        if (charts.agentActivityChart) {
+            charts.agentActivityChart.destroy();
+        }
+
+        // Group by agent_id and sum messages_sent and messages_received
+        const agentData = {};
+        agentMetrics.forEach(metric => {
+            const agentId = metric.agent_id;
+            if (!agentData[agentId]) {
+                agentData[agentId] = {
+                    sent: 0,
+                    received: 0
+                };
+            }
+            agentData[agentId].sent += metric.messages_sent;
+            agentData[agentId].received += metric.messages_received;
+        });
+
+        const agentIds = Object.keys(agentData);
+        const labels = agentIds.map(id => agentNames[id] || id);
+        const sentData = agentIds.map(id => agentData[id].sent);
+        const receivedData = agentIds.map(id => agentData[id].received);
+
+        charts.agentActivityChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Messages Sent',
+                        data: sentData,
+                        backgroundColor: '#4e73df',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Messages Received',
+                        data: receivedData,
+                        backgroundColor: '#1cc88a',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Message Count'
+                        }
+                    }
+                }
+            }
+        });
+
+        document.getElementById('agentActivityLoading').style.display = 'none';
+    }
+
+    // Create topic activity chart
+    function createTopicActivityChart(topicMetrics) {
+        const ctx = document.getElementById('topicActivityChart').getContext('2d');
+
+        // Destroy existing chart if it exists
+        if (charts.topicActivityChart) {
+            charts.topicActivityChart.destroy();
+        }
+
+        // Group by topic and timestamp
+        const topicData = {};
+        topicMetrics.forEach(metric => {
+            const topic = metric.topic;
+            if (!topicData[topic]) {
+                topicData[topic] = [];
+            }
+            topicData[topic].push({
+                x: new Date(metric.timestamp),
+                y: metric.message_count
+            });
+        });
+
+        const datasets = Object.keys(topicData).map((topic, index) => {
+            // Generate a color based on index
+            const hue = (index * 137) % 360;
+            const color = `hsl(${hue}, 70%, 60%)`;
+
+            return {
+                label: topic,
+                data: topicData[topic].sort((a, b) => a.x - b.x),
+                borderColor: color,
+                backgroundColor: color + '20',
+                fill: false,
+                tension: 0.4
+            };
+        });
+
+        charts.topicActivityChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'hour',
+                            displayFormats: {
+                                hour: 'MMM D, HH:mm'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Message Count'
+                        }
+                    }
+                }
+            }
+        });
+
+        document.getElementById('topicActivityLoading').style.display = 'none';
+    }
+
+    // Create message flow Sankey diagram
+    function createMessageFlowDiagram(messageMetrics) {
+        // Hide loading indicator
+        document.getElementById('messageFlowLoading').style.display = 'none';
+        document.getElementById('messageFlow').style.display = 'block';
+
+        // Prepare data for Sankey diagram
+        const nodes = [];
+        const links = [];
+        const nodeMap = {};
+
+        // Add source and destination agents as nodes
+        messageMetrics.forEach(metric => {
+            const sourceId = metric.source_agent_id;
+            const destId = metric.destination_agent_id;
+
+            if (sourceId && !nodeMap[sourceId]) {
+                nodeMap[sourceId] = nodes.length;
+                nodes.push({ id: sourceId, name: agentNames[sourceId] || sourceId });
+            }
+
+            if (destId && !nodeMap[destId]) {
+                nodeMap[destId] = nodes.length;
+                nodes.push({ id: destId, name: agentNames[destId] || destId });
+            }
+        });
+
+        // Add links between agents
+        const linkMap = {};
+        messageMetrics.forEach(metric => {
+            const sourceId = metric.source_agent_id;
+            const destId = metric.destination_agent_id;
+
+            if (sourceId && destId) {
+                const linkKey = `${sourceId}-${destId}`;
+                if (!linkMap[linkKey]) {
+                    linkMap[linkKey] = {
+                        source: nodeMap[sourceId],
+                        target: nodeMap[destId],
+                        value: 0
+                    };
+                    links.push(linkMap[linkKey]);
+                }
+                linkMap[linkKey].value += 1;
+            }
+        });
+
+        // Create Sankey diagram
+        const width = document.getElementById('messageFlow').clientWidth;
+        const height = document.getElementById('messageFlow').clientHeight;
+
+        const svg = d3.select('#messageFlow')
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        const sankey = d3.sankey()
+            .nodeWidth(15)
+            .nodePadding(10)
+            .extent([[1, 1], [width - 1, height - 5]]);
+
+        const sankeyData = {
+            nodes: nodes.map(d => Object.assign({}, d)),
+            links: links.map(d => Object.assign({}, d))
+        };
+
+        const { nodes: sankeyNodes, links: sankeyLinks } = sankey(sankeyData);
+
+        // Add links
+        svg.append('g')
+            .selectAll('path')
+            .data(sankeyLinks)
+            .join('path')
+            .attr('d', d3.sankeyLinkHorizontal())
+            .attr('stroke', '#aaa')
+            .attr('stroke-width', d => Math.max(1, d.width))
+            .attr('fill', 'none')
+            .attr('opacity', 0.5)
+            .append('title')
+            .text(d => `${d.source.name} → ${d.target.name}: ${d.value} messages`);
+
+        // Add nodes
+        const node = svg.append('g')
+            .selectAll('rect')
+            .data(sankeyNodes)
+            .join('rect')
+            .attr('x', d => d.x0)
+            .attr('y', d => d.y0)
+            .attr('height', d => d.y1 - d.y0)
+            .attr('width', d => d.x1 - d.x0)
+            .attr('fill', '#4e73df')
+            .attr('stroke', '#000')
+            .append('title')
+            .text(d => `${d.name}: ${d.value} messages`);
+
+        // Add node labels
+        svg.append('g')
+            .selectAll('text')
+            .data(sankeyNodes)
+            .join('text')
+            .attr('x', d => d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6)
+            .attr('y', d => (d.y1 + d.y0) / 2)
+            .attr('dy', '0.35em')
+            .attr('text-anchor', d => d.x0 < width / 2 ? 'start' : 'end')
+            .text(d => d.name)
+            .style('font-size', '10px')
+            .style('fill', '#333');
+    }
+</script>
+{% endblock %}

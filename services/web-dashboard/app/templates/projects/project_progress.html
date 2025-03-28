@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}Project Progress - {{ project.name }}{% endblock %}
+
+{% block styles %}
+<!-- Chart.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css">
+<style>
+    .progress-card {
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .progress-card .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #e9ecef;
+        font-weight: 600;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+
+    .timeline-container {
+        height: 400px;
+        width: 100%;
+    }
+
+    .health-indicator {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .health-indicator .indicator {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        margin-right: 10px;
+    }
+
+    .health-indicator .indicator.green {
+        background-color: #28a745;
+    }
+
+    .health-indicator .indicator.yellow {
+        background-color: #ffc107;
+    }
+
+    .health-indicator .indicator.red {
+        background-color: #dc3545;
+    }
+
+    .health-indicator .label {
+        font-weight: 500;
+    }
+
+    .health-indicator .value {
+        margin-left: auto;
+        font-weight: 600;
+    }
+
+    .task-progress {
+        margin-bottom: 15px;
+    }
+
+    .task-progress .task-name {
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .task-progress .progress {
+        height: 10px;
+        margin-bottom: 5px;
+    }
+
+    .task-progress .task-details {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .agent-activity-item {
+        padding: 10px;
+        border-left: 3px solid #007bff;
+        margin-bottom: 10px;
+        background-color: #f8f9fa;
+    }
+
+    .agent-activity-item .timestamp {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .agent-activity-item .agent-name {
+        font-weight: 600;
+    }
+
+    .agent-activity-item .activity-description {
+        margin-top: 5px;
+    }
+
+    .alert-badge {
+        position: relative;
+        display: inline-block;
+    }
+
+    .alert-badge .badge {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        border-radius: 50%;
+        padding: 5px 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center my-4">
+        <h1>{{ project.name }} - Progress</h1>
+        <div>
+            <a href="{{ url_for('project_detail', project_id=project.id) }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-arrow-left"></i> Back to Project
+            </a>
+            <div class="alert-badge">
+                <a href="#projectAlerts" class="btn btn-primary" data-bs-toggle="collapse" role="button"
+                    aria-expanded="false" aria-controls="projectAlerts">
+                    <i class="fas fa-bell"></i> Alerts
+                </a>
+                {% if project_alerts|length > 0 %}
+                <span class="badge bg-danger">{{ project_alerts|length }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Alerts -->
+    <div class="collapse mb-4" id="projectAlerts">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Project Alerts</h5>
+            </div>
+            <div class="card-body">
+                {% if project_alerts|length > 0 %}
+                <div class="list-group">
+                    {% for alert in project_alerts %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ alert.name }}</h6>
+                            <span class="badge bg-{{ alert.severity_class }}">{{ alert.severity }}</span>
+                        </div>
+                        <p class="mb-1">{{ alert.message }}</p>
+                        <small class="text-muted">{{ alert.timestamp }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-success">No active alerts for this project.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Project Overview -->
+        <div class="col-md-4">
+            <div class="card progress-card h-100">
+                <div class="card-header">
+                    Project Overview
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5>Overall Progress</h5>
+                        <div class="progress mb-2" style="height: 20px;">
+                            <div class="progress-bar" role="progressbar"
+                                style="width: {{ project.metadata.progress }}%;"
+                                aria-valuenow="{{ project.metadata.progress }}" aria-valuemin="0" aria-valuemax="100">
+                                {{ project.metadata.progress }}%
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <small>Start: {{ project.created_at|date }}</small>
+                            <small>Deadline: {{ project.metadata.deadline|date }}</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Project Health</h5>
+                        <div class="health-indicator">
+                            <div class="indicator {{ project_health.schedule.color }}"></div>
+                            <div class="label">Schedule</div>
+                            <div class="value">{{ project_health.schedule.status }}</div>
+                        </div>
+                        <div class="health-indicator">
+                            <div class="indicator {{ project_health.resources.color }}"></div>
+                            <div class="label">Resources</div>
+                            <div class="value">{{ project_health.resources.status }}</div>
+                        </div>
+                        <div class="health-indicator">
+                            <div class="indicator {{ project_health.quality.color }}"></div>
+                            <div class="label">Quality</div>
+                            <div class="value">{{ project_health.quality.status }}</div>
+                        </div>
+                        <div class="health-indicator">
+                            <div class="indicator {{ project_health.overall.color }}"></div>
+                            <div class="label">Overall</div>
+                            <div class="value">{{ project_health.overall.status }}</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h5>Project Stats</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="mb-3">
+                                    <div class="text-muted">Tasks</div>
+                                    <div class="h4">{{ project.tasks|length }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="mb-3">
+                                    <div class="text-muted">Agents</div>
+                                    <div class="h4">{{ project.agents|length }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="mb-3">
+                                    <div class="text-muted">Completed</div>
+                                    <div class="h4">{{ completed_tasks }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="mb-3">
+                                    <div class="text-muted">Pending</div>
+                                    <div class="h4">{{ pending_tasks }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task Progress -->
+        <div class="col-md-8">
+            <div class="card progress-card">
+                <div class="card-header">
+                    Task Progress
+                </div>
+                <div class="card-body">
+                    {% for task in project.tasks %}
+                    <div class="task-progress">
+                        <div class="task-name">
+                            <span>{{ task.name }}</span>
+                            <span>{{ task.progress }}%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-{{ task.status_class }}" role="progressbar"
+                                style="width: {{ task.progress }}%;" aria-valuenow="{{ task.progress }}"
+                                aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <div class="task-details">
+                            <span>{{ task.status }}</span>
+                            <span>{{ task.assigned_to }}</span>
+                            <span>Due: {{ task.due_date }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Progress Chart -->
+            <div class="card progress-card mt-4">
+                <div class="card-header">
+                    Progress Over Time
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="progress-chart" data-dates="{{ progress_data.dates | tojson }}"
+                            data-planned="{{ progress_data.planned | tojson }}"
+                            data-actual="{{ progress_data.actual | tojson }}"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Agent Activity Timeline -->
+        <div class="col-md-6">
+            <div class="card progress-card">
+                <div class="card-header">
+                    Agent Activity Timeline
+                </div>
+                <div class="card-body">
+                    <div class="timeline-container">
+                        <canvas id="timeline-chart" data-timeline="{{ agent_timeline | tojson }}"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Agent Activities -->
+        <div class="col-md-6">
+            <div class="card progress-card">
+                <div class="card-header">
+                    Recent Agent Activities
+                </div>
+                <div class="card-body">
+                    {% for activity in agent_activities %}
+                    <div class="agent-activity-item">
+                        <div class="d-flex justify-content-between">
+                            <span class="agent-name">{{ activity.agent_name }}</span>
+                            <span class="timestamp">{{ activity.timestamp }}</span>
+                        </div>
+                        <div class="activity-description">
+                            {{ activity.description }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<!-- Moment.js for date handling -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<!-- Chart.js Adapter for Moment.js -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.1/dist/chartjs-adapter-moment.min.js"></script>
+<!-- Project Progress Charts -->
+<script src="{{ url_for('static', filename='js/project_progress.js') }}"></script>
+{% endblock %}

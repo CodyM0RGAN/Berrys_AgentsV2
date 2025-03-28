@@ -1,7 +1,8 @@
 import os
 import json
 import asyncio
-import aioredis
+# Import aioredis but avoid importing its TimeoutError
+import redis.asyncio as redis 
 from typing import Dict, List, Any, Callable, Awaitable, Optional, Union
 import logging
 from uuid import uuid4
@@ -40,7 +41,7 @@ class MessageBroker:
         Connect to Redis.
         """
         try:
-            self.redis = await aioredis.from_url(self.redis_url, decode_responses=True)
+            self.redis = await redis.from_url(self.redis_url, decode_responses=True)
             self.pubsub = self.redis.pubsub()
             logger.info(f"Connected to Redis at {self.redis_url}")
         except Exception as e:

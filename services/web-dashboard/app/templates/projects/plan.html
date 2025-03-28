@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Strategic Plan: {{ plan.name }}</h1>
+        <div>
+            <a href="{{ url_for('project_detail', project_id=plan.project_id) }}"
+                class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i> Back to Project
+            </a>
+            <a href="{{ url_for('edit_plan', plan_id=plan.id) }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-edit me-2"></i> Edit Plan
+            </a>
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                data-bs-target="#deletePlanModal">
+                <i class="fas fa-trash-alt me-2"></i> Delete Plan
+            </button>
+        </div>
+    </div>
+
+    <!-- Plan Overview -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i> Plan Overview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Description</h6>
+                        <p>{{ plan.description }}</p>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Status</h6>
+                            <span
+                                class="badge {% if plan.status == 'COMPLETED' %}bg-success{% elif plan.status == 'ACTIVE' %}bg-primary{% else %}bg-secondary{% endif %} fs-6 p-2">
+                                {{ plan.status }}
+                            </span>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Project Type</h6>
+                            <p>{{ plan.metadata.project_type }}</p>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Created</h6>
+                            <p>{{ plan.created_at }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">Last Updated</h6>
+                            <p>{{ plan.updated_at }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bullseye me-2"></i> Goals & Constraints
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-2">Goals</h6>
+                        <p>{{ plan.metadata.goals }}</p>
+                    </div>
+                    <div>
+                        <h6 class="text-muted mb-2">Constraints</h6>
+                        <p>{{ plan.metadata.constraints }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tasks -->
+    <div class="card shadow mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-tasks me-2"></i> Tasks
+            </h5>
+            <a href="{{ url_for('new_task', plan_id=plan.id) }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-plus me-1"></i> Add Task
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Assigned To</th>
+                            <th>Due Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in plan.tasks %}
+                        <tr>
+                            <td>{{ task.name }}</td>
+                            <td>
+                                <span
+                                    class="badge {% if task.status == 'COMPLETED' %}bg-success{% elif task.status == 'IN_PROGRESS' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                    {{ task.status }}
+                                </span>
+                            </td>
+                            <td>{{ task.assigned_to }}</td>
+                            <td>{{ task.due_date }}</td>
+                            <td>
+                                <a href="{{ url_for('edit_task', task_id=task.id) }}"
+                                    class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal"
+                                    data-bs-target="#deleteTaskModal{{ task.id }}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline Forecast -->
+    <div class="card shadow mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line me-2"></i> Timeline Forecast
+            </h5>
+            <a href="{{ url_for('generate_forecast', plan_id=plan.id) }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-sync me-1"></i> Generate Forecast
+            </a>
+        </div>
+        <div class="card-body">
+            {% if plan.forecast %}
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Estimated Completion Date</h6>
+                    <p>{{ plan.forecast.estimated_completion_date }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Confidence Level</h6>
+                    <p>{{ plan.forecast.confidence_level }}%</p>
+                </div>
+            </div>
+            <div class="mt-4">
+                <h6 class="text-muted mb-2">Timeline Chart</h6>
+                <canvas id="timelineChart" width="400" height="200"></canvas>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i> No forecast data available. Click "Generate Forecast" to create
+                a timeline forecast.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Critical Path -->
+    <div class="card shadow mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-route me-2"></i> Critical Path
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if plan.critical_path %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Task</th>
+                            <th>Duration</th>
+                            <th>Slack</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in plan.critical_path %}
+                        <tr>
+                            <td>{{ task.name }}</td>
+                            <td>{{ task.duration }} days</td>
+                            <td>{{ task.slack }} days</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i> No critical path data available. Generate a forecast to
+                calculate the critical path.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Bottlenecks -->
+    <div class="card shadow">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-exclamation-triangle me-2"></i> Bottlenecks
+            </h5>
+            <a href="{{ url_for('analyze_bottlenecks', plan_id=plan.id) }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-search me-1"></i> Analyze Bottlenecks
+            </a>
+        </div>
+        <div class="card-body">
+            {% if plan.bottlenecks %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Resource</th>
+                            <th>Utilization</th>
+                            <th>Impact</th>
+                            <th>Recommendation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bottleneck in plan.bottlenecks %}
+                        <tr>
+                            <td>{{ bottleneck.resource }}</td>
+                            <td>{{ bottleneck.utilization }}%</td>
+                            <td>{{ bottleneck.impact }}</td>
+                            <td>{{ bottleneck.recommendation }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i> No bottleneck data available. Click "Analyze Bottlenecks" to
+                identify potential bottlenecks.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Delete Plan Confirmation Modal -->
+    <div class="modal fade" id="deletePlanModal" tabindex="-1" aria-labelledby="deletePlanModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deletePlanModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the plan "{{ plan.name }}"? This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ url_for('delete_plan', plan_id=plan.id) }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if plan.forecast %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('timelineChart').getContext('2d');
+        const timelineChart = new Chart(ctx, {
+            type: 'gantt',
+            data: {
+                datasets: [{
+                    data: {{ plan.forecast.timeline_data | tojson }}
+        }]
+            },
+        options: {
+        scales: {
+            x: {
+                type: 'time',
+                time: {
+                    unit: 'day'
+                }
+            },
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

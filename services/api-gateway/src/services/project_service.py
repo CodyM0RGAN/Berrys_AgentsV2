@@ -8,8 +8,8 @@ from datetime import datetime
 
 # Import shared modules
 from shared.utils.src.logging import get_logger
-from shared.models.src.project import Project, ProjectCreate, ProjectUpdate, ProjectSummary, ProjectWithStats
 from shared.utils.src.messaging import get_event_bus, get_command_bus
+from shared.models.src.project import Project, ProjectCreate, ProjectUpdate, ProjectSummary, ProjectWithStats
 
 # Import database models (these would be SQLAlchemy ORM models)
 from ..models.project import ProjectModel
@@ -90,7 +90,7 @@ class ProjectService:
             name=project.name,
             description=project.description,
             status=project.status,
-            metadata=project.metadata,
+            project_metadata=project.metadata,  # Using project_metadata field name to match the model
             owner_id=user_id,
         )
         
@@ -179,7 +179,7 @@ class ProjectService:
             update_values["status"] = project.status
             
         if project.metadata is not None:
-            update_values["metadata"] = project.metadata
+            update_values["project_metadata"] = project.metadata  # Using project_metadata field name to match the model
             
         # Add updated_at timestamp
         update_values["updated_at"] = datetime.utcnow()

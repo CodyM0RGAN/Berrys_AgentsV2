@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-edit me-2"></i> Edit Strategic Plan
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('edit_plan', plan_id=plan.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Plan Name</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ plan.name }}"
+                                required autofocus>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="4"
+                                required>{{ plan.description }}</textarea>
+                            <div class="form-text">Provide a detailed description of the strategic plan.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="project_id" class="form-label">Project</label>
+                            <input type="text" class="form-control" value="{{ plan.project_name }}" readonly disabled>
+                            <div class="form-text">Project cannot be changed after plan creation.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="DRAFT" {% if plan.status=='DRAFT' %}selected{% endif %}>Draft</option>
+                                <option value="ACTIVE" {% if plan.status=='ACTIVE' %}selected{% endif %}>Active</option>
+                                <option value="COMPLETED" {% if plan.status=='COMPLETED' %}selected{% endif %}>Completed
+                                </option>
+                                <option value="ARCHIVED" {% if plan.status=='ARCHIVED' %}selected{% endif %}>Archived
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="project_type" class="form-label">Project Type</label>
+                            <select class="form-select" id="project_type" name="project_type" required>
+                                <option value="Software Development" {% if
+                                    plan.metadata.project_type=='Software Development' %}selected{% endif %}>Software
+                                    Development</option>
+                                <option value="Data Analysis" {% if plan.metadata.project_type=='Data Analysis'
+                                    %}selected{% endif %}>Data Analysis</option>
+                                <option value="Content Creation" {% if plan.metadata.project_type=='Content Creation'
+                                    %}selected{% endif %}>Content Creation</option>
+                                <option value="Research" {% if plan.metadata.project_type=='Research' %}selected{% endif
+                                    %}>Research</option>
+                                <option value="Other" {% if plan.metadata.project_type=='Other' %}selected{% endif %}>
+                                    Other</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="goals" class="form-label">Goals</label>
+                            <textarea class="form-control" id="goals" name="goals" rows="3"
+                                required>{{ plan.metadata.goals }}</textarea>
+                            <div class="form-text">Describe the specific goals and objectives of the plan.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="constraints" class="form-label">Constraints</label>
+                            <textarea class="form-control" id="constraints" name="constraints"
+                                rows="3">{{ plan.metadata.constraints }}</textarea>
+                            <div class="form-text">Describe any constraints such as budget, time, resources, etc.</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('plan_detail', plan_id=plan.id) }}"
+                                class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-2"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i> Update Plan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow mt-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Danger Zone
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p>Permanently delete this plan and all of its tasks.</p>
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                        data-bs-target="#deletePlanModal">
+                        <i class="fas fa-trash-alt me-2"></i> Delete Plan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Plan Confirmation Modal -->
+    <div class="modal fade" id="deletePlanModal" tabindex="-1" aria-labelledby="deletePlanModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deletePlanModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the plan "{{ plan.name }}"? This action cannot be undone and will
+                    delete all tasks associated with this plan.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ url_for('delete_plan', plan_id=plan.id) }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

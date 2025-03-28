@@ -1,115 +1,165 @@
-import os
-from typing import AsyncGenerator, Optional
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import MetaData
-from contextlib import asynccontextmanager
-import logging
+"""
+Database utilities for the Berrys_AgentsV2 project.
 
-logger = logging.getLogger(__name__)
+This module provides common database utilities used across services, including:
+- UUID type for SQLAlchemy models
+- Common column definitions
+- Database connection utilities
+"""
 
-# Get database URL from environment variable or use default
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework")
+import uuid
+from typing import Any, Optional, TypeVar, cast
 
-# Create async engine
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=False,  # Set to True for SQL query logging
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=1800,
-)
+from sqlalchemy import TypeDecorator, String
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy.engine.interfaces import Dialect
 
-# Create session factory
-AsyncSessionLocal = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
-
-# Create base class for declarative models
-Base = declarative_base(metadata=MetaData())
+T = TypeVar('T')
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+class UUID(TypeDecorator):
     """
-    Get a database session.
+    Platform-independent UUID type.
+
+    Uses PostgreSQL's UUID type when available, otherwise uses String(36).
     
-    Yields:
-        AsyncSession: Database session
+    This implementation is based on the SQLAlchemy documentation and has been
+    enhanced with better error handling and cross-database compatibility.
     """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Database error: {str(e)}")
-            raise
-        finally:
-            await session.close()
+
+    impl = String
+    cache_ok = True
+
+    def __init__(self, as_uuid: bool = False):
+        """
+        Initialize the UUID type.
+
+        Args:
+            as_uuid: If True, return Python UUID objects, otherwise return strings.
+        """
+        self.as_uuid = as_uuid
+        super().__init__(36)
+
+    def load_dialect_impl(self, dialect: Dialect) -> Any:
+        """
+        Load the dialect-specific implementation of this type.
+
+        Args:
+            dialect: The SQLAlchemy dialect.
+
+        Returns:
+            The dialect-specific implementation.
+        """
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PostgresUUID(as_uuid=self.as_uuid))
+        else:
+            return dialect.type_descriptor(String(36))
+
+    def process_bind_param(self, value: Any, dialect: Dialect) -> Optional[str]:
+        """
+        Process the value before binding it to a statement.
+
+        Args:
+            value: The value to process.
+            dialect: The SQLAlchemy dialect.
+
+        Returns:
+            The processed value.
+        """
+        if value is None:
+            return None
+        
+        if dialect.name == 'postgresql' and not self.as_uuid:
+            # PostgreSQL can handle UUID objects directly
+            return str(value)
+        
+        if not isinstance(value, uuid.UUID):
+            try:
+                value = uuid.UUID(value)
+            except (TypeError, ValueError, AttributeError):
+                raise ValueError(f"Invalid UUID: {value}")
+        
+        if self.as_uuid:
+            return value
+        
+        return str(value)
+
+    def process_result_value(self, value: Any, dialect: Dialect) -> Optional[Any]:
+        """
+        Process the value after retrieving it from the database.
+
+        Args:
+            value: The value to process.
+            dialect: The SQLAlchemy dialect.
+
+        Returns:
+            The processed value.
+        """
+        if value is None:
+            return None
+        
+        if self.as_uuid:
+            if isinstance(value, uuid.UUID):
+                return value
+            try:
+                return uuid.UUID(value)
+            except (TypeError, ValueError, AttributeError):
+                raise ValueError(f"Invalid UUID: {value}")
+        
+        if isinstance(value, uuid.UUID):
+            return str(value)
+        
+        return value
 
 
-@asynccontextmanager
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
+def generate_uuid() -> str:
     """
-    Context manager for database sessions.
-    
-    Yields:
-        AsyncSession: Database session
-    """
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Database error: {str(e)}")
-            raise
-        finally:
-            await session.close()
+    Generate a new UUID string.
 
-
-async def init_db() -> None:
-    """
-    Initialize the database by creating all tables.
-    """
-    try:
-        async with engine.begin() as conn:
-            # Create tables if they don't exist
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Database initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing database: {str(e)}")
-        raise
-
-
-async def check_db_connection() -> bool:
-    """
-    Check if the database connection is working.
-    
     Returns:
-        bool: True if connection is successful, False otherwise
+        A new UUID string.
     """
-    try:
-        async with engine.connect() as conn:
-            await conn.execute("SELECT 1")
-        return True
-    except Exception as e:
-        logger.error(f"Database connection error: {str(e)}")
-        return False
+    return str(uuid.uuid4())
 
 
-async def close_db_connection() -> None:
+# Common column definitions
+def uuid_column(nullable: bool = False, primary_key: bool = False) -> UUID:
     """
-    Close the database connection.
+    Create a UUID column.
+
+    Args:
+        nullable: Whether the column can be NULL.
+        primary_key: Whether the column is a primary key.
+
+    Returns:
+        A UUID column.
     """
-    try:
-        await engine.dispose()
-        logger.info("Database connection closed")
-    except Exception as e:
-        logger.error(f"Error closing database connection: {str(e)}")
+    return UUID(as_uuid=False)
+
+
+def timestamp_columns() -> dict:
+    """
+    Create created_at and updated_at column definitions.
+
+    Returns:
+        A dictionary with created_at and updated_at column definitions.
+    """
+    from sqlalchemy import Column, DateTime, func
+    
+    return {
+        'created_at': Column(DateTime, nullable=False, default=func.now()),
+        'updated_at': Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    }
+
+
+def metadata_column(nullable: bool = True) -> String:
+    """
+    Create a metadata column.
+
+    Args:
+        nullable: Whether the column can be NULL.
+
+    Returns:
+        A metadata column.
+    """
+    return String(1024, nullable=nullable)

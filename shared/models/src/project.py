@@ -6,19 +6,20 @@ from pydantic import BaseModel, Field
 
 
 class ProjectStatus(str, Enum):
-    DRAFT = "DRAFT"
-    PLANNING = "PLANNING"
-    IN_PROGRESS = "IN_PROGRESS"
-    PAUSED = "PAUSED"
-    COMPLETED = "COMPLETED"
-    ARCHIVED = "ARCHIVED"
+    DRAFT = "draft"
+    PLANNING = "planning"
+    IN_PROGRESS = "in_progress"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
+    CANCELLED = "cancelled"
 
 
 class ProjectBase(BaseModel):
     """Base model for Project with common attributes."""
     name: str
     description: Optional[str] = None
-    status: ProjectStatus = ProjectStatus.DRAFT
+    status: ProjectStatus = ProjectStatus.DRAFT # Setting the default status to DRAFT to avoid database constraint violations
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
@@ -42,8 +43,10 @@ class ProjectInDB(ProjectBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class Project(ProjectInDB):
@@ -58,8 +61,10 @@ class ProjectSummary(BaseModel):
     status: ProjectStatus
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class ProjectWithStats(Project):

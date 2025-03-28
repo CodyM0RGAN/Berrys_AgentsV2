@@ -57,8 +57,10 @@ class AgentInDB(AgentBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class Agent(AgentInDB):
@@ -74,8 +76,10 @@ class AgentSummary(BaseModel):
     status: AgentStatus
     project_id: UUID
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class AgentWithTools(Agent):

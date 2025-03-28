@@ -61,8 +61,10 @@ class AuditLog(BaseModel):
     actor_id: Optional[UUID] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class PerformanceMetric(BaseModel):
@@ -75,8 +77,10 @@ class PerformanceMetric(BaseModel):
     context: Optional[Dict[str, Any]] = None
     recorded_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class OptimizationSuggestion(BaseModel):
@@ -90,8 +94,10 @@ class OptimizationSuggestion(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class OptimizationImplementation(BaseModel):

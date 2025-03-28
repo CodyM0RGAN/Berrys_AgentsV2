@@ -4,7 +4,6 @@ from sqlalchemy.orm import relationship
 import uuid
 
 from .base import BaseModel
-from .agent import agent_tool_association
 
 
 class ToolModel(BaseModel):
@@ -29,8 +28,12 @@ class ToolModel(BaseModel):
     # Status
     status = Column(String(20), nullable=False, default="DISCOVERED")
     
-    # Relationships
-    agents = relationship("AgentModel", secondary=agent_tool_association, back_populates="tools")
+    # Relationships - using string references to avoid circular imports
+    agents = relationship(
+        "AgentModel", 
+        secondary="agent_tool", 
+        back_populates="tools"
+    )
     
     def __repr__(self):
         return f"<Tool(id={self.id}, name='{self.name}', capability='{self.capability}', source='{self.source}')>"

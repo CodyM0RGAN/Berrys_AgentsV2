@@ -2,13 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from uuid import UUID
-import logging
 
 # Import shared modules
-from shared.utils.src.database import get_db
 from shared.utils.src.auth import get_current_user, require_permission
 from shared.utils.src.logging import get_logger
-from shared.models.src.project import Project, ProjectCreate, ProjectUpdate, ProjectSummary, ProjectWithStats
+
+# Import local modules
+from ..database import get_db
+from shared.models.src.project import (
+    Project, ProjectCreate, ProjectUpdate, ProjectSummary, ProjectWithStats
+)
 from shared.models.src.user import User, Permission
 
 # Import services

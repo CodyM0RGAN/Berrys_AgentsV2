@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog me-2"></i> Settings
+                    </h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="#display-settings" class="list-group-item list-group-item-action active"
+                        data-bs-toggle="list">
+                        <i class="fas fa-desktop me-2"></i> Display
+                    </a>
+                    <a href="#notification-settings" class="list-group-item list-group-item-action"
+                        data-bs-toggle="list">
+                        <i class="fas fa-bell me-2"></i> Notifications
+                    </a>
+                    <a href="#api-settings" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                        <i class="fas fa-plug me-2"></i> API
+                    </a>
+                    <a href="#privacy-settings" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                        <i class="fas fa-shield-alt me-2"></i> Privacy
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="tab-content">
+                <!-- Display Settings -->
+                <div class="tab-pane fade show active" id="display-settings">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-desktop me-2"></i> Display Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('update_settings') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="settings_type" value="display">
+
+                                <div class="mb-3">
+                                    <label class="form-label">Theme</label>
+                                    <div class="d-flex">
+                                        <div class="form-check me-4">
+                                            <input class="form-check-input" type="radio" name="theme" id="theme-light"
+                                                value="light" {% if settings.display.theme=='light' %}checked{% endif
+                                                %}>
+                                            <label class="form-check-label" for="theme-light">
+                                                <i class="fas fa-sun me-1 text-warning"></i> Light
+                                            </label>
+                                        </div>
+                                        <div class="form-check me-4">
+                                            <input class="form-check-input" type="radio" name="theme" id="theme-dark"
+                                                value="dark" {% if settings.display.theme=='dark' %}checked{% endif %}>
+                                            <label class="form-check-label" for="theme-dark">
+                                                <i class="fas fa-moon me-1 text-primary"></i> Dark
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="theme" id="theme-system"
+                                                value="system" {% if settings.display.theme=='system' %}checked{% endif
+                                                %}>
+                                            <label class="form-check-label" for="theme-system">
+                                                <i class="fas fa-laptop me-1 text-secondary"></i> System
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Dashboard Layout</label>
+                                    <select class="form-select" name="dashboard_layout">
+                                        <option value="grid" {% if settings.display.dashboard_layout=='grid'
+                                            %}selected{% endif %}>Grid</option>
+                                        <option value="list" {% if settings.display.dashboard_layout=='list'
+                                            %}selected{% endif %}>List</option>
+                                        <option value="compact" {% if settings.display.dashboard_layout=='compact'
+                                            %}selected{% endif %}>Compact</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="items_per_page" class="form-label">Items Per Page</label>
+                                    <input type="number" class="form-control" id="items_per_page" name="items_per_page"
+                                        min="5" max="100" value="{{ settings.display.items_per_page }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="show_welcome"
+                                            name="show_welcome" {% if settings.display.show_welcome %}checked{% endif
+                                            %}>
+                                        <label class="form-check-label" for="show_welcome">Show welcome message on
+                                            dashboard</label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="enable_animations"
+                                            name="enable_animations" {% if settings.display.enable_animations
+                                            %}checked{% endif %}>
+                                        <label class="form-check-label" for="enable_animations">Enable
+                                            animations</label>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i> Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notification Settings -->
+                <div class="tab-pane fade" id="notification-settings">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-bell me-2"></i> Notification Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('update_settings') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="settings_type" value="notifications">
+
+                                <div class="mb-3">
+                                    <label class="form-label">Notification Channels</label>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="email_notifications"
+                                            name="email" {% if settings.notifications.email %}checked{% endif %}>
+                                        <label class="form-check-label" for="email_notifications">
+                                            <i class="fas fa-envelope me-2"></i> Email Notifications
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="browser_notifications"
+                                            name="browser" {% if settings.notifications.browser %}checked{% endif %}>
+                                        <label class="form-check-label" for="browser_notifications">
+                                            <i class="fas fa-desktop me-2"></i> Browser Notifications
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="mobile_notifications"
+                                            name="mobile" {% if settings.notifications.mobile %}checked{% endif %}>
+                                        <label class="form-check-label" for="mobile_notifications">
+                                            <i class="fas fa-mobile-alt me-2"></i> Mobile Notifications
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Notification Types</label>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="project_updates"
+                                            name="project_updates" checked>
+                                        <label class="form-check-label" for="project_updates">
+                                            Project Updates
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent_status"
+                                            name="agent_status" checked>
+                                        <label class="form-check-label" for="agent_status">
+                                            Agent Status Changes
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="system_alerts"
+                                            name="system_alerts" checked>
+                                        <label class="form-check-label" for="system_alerts">
+                                            System Alerts
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i> Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Settings -->
+                <div class="tab-pane fade" id="api-settings">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-plug me-2"></i> API Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('update_settings') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="settings_type" value="api">
+
+                                <div class="mb-3">
+                                    <label for="gateway_url" class="form-label">API Gateway URL</label>
+                                    <input type="url" class="form-control" id="gateway_url" name="gateway_url"
+                                        value="{{ settings.api.gateway_url }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="timeout" class="form-label">API Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="timeout" name="timeout" min="1"
+                                        max="60" value="{{ settings.api.timeout }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="retry_attempts" class="form-label">Retry Attempts</label>
+                                    <input type="number" class="form-control" id="retry_attempts" name="retry_attempts"
+                                        min="0" max="5" value="3">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="cache_duration" class="form-label">Cache Duration (seconds)</label>
+                                    <input type="number" class="form-control" id="cache_duration" name="cache_duration"
+                                        min="0" max="3600" value="300">
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i> Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Privacy Settings -->
+                <div class="tab-pane fade" id="privacy-settings">
+                    <div class="card shadow">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-shield-alt me-2"></i> Privacy Settings
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('update_settings') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="settings_type" value="privacy">
+
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="analytics" name="analytics"
+                                            checked>
+                                        <label class="form-check-label" for="analytics">Allow anonymous usage
+                                            analytics</label>
+                                    </div>
+                                    <div class="form-text">
+                                        This helps us improve the application by collecting anonymous usage data.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="cookies" name="cookies"
+                                            checked>
+                                        <label class="form-check-label" for="cookies">Accept cookies</label>
+                                    </div>
+                                    <div class="form-text">
+                                        Cookies are required for the application to function properly.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="third_party"
+                                            name="third_party" checked>
+                                        <label class="form-check-label" for="third_party">Allow third-party
+                                            integrations</label>
+                                    </div>
+                                    <div class="form-text">
+                                        This allows the application to integrate with third-party services.
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i> Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Activate the correct tab based on URL hash
+    document.addEventListener('DOMContentLoaded', function () {
+        const hash = window.location.hash || '#display-settings';
+        const tab = document.querySelector(`a[href="${hash}"]`);
+        if (tab) {
+            const tabInstance = new bootstrap.Tab(tab);
+            tabInstance.show();
+        }
+    });
+
+    // Update URL hash when tab changes
+    const tabs = document.querySelectorAll('a[data-bs-toggle="list"]');
+    tabs.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function (event) {
+            window.location.hash = event.target.getAttribute('href');
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+# Tool Integration Migrations
+
+This directory contains database migration scripts for the Tool Integration service.
+
+## Migration Scripts
+
+- `tool_integration_standardization.py`: Standardizes the Tool Integration service by renaming tables from plural to singular, converting lowercase enum values to uppercase, and adding check constraints for enum values.
+
+## Running Migrations
+
+To apply migrations, use the following command:
+
+```bash
+cd services/tool-integration
+alembic upgrade head
+```
+
+To create a new migration, use the following command:
+
+```bash
+cd services/tool-integration
+alembic revision -m "description of the migration"
+```
+
+## Migration Guidelines
+
+1. Always create a migration script for database schema changes
+2. Test migrations on a development database before applying to production
+3. Include both upgrade and downgrade functions in migration scripts
+4. Document the purpose of each migration script
+5. Use idempotent operations where possible to avoid errors if a migration is run multiple times

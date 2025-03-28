@@ -5,16 +5,8 @@ import uuid
 
 from .base import BaseModel
 
-
-# Task dependencies table
-task_dependency = Table(
-    'task_dependencies',
-    BaseModel.metadata,
-    Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-    Column('dependent_task_id', UUID(as_uuid=True), ForeignKey('tasks.id', ondelete="CASCADE"), nullable=False),
-    Column('dependency_task_id', UUID(as_uuid=True), ForeignKey('tasks.id', ondelete="CASCADE"), nullable=False),
-    Column('dependency_type', String(20), nullable=False, default="FINISH_TO_START"),
-)
+# Task dependencies table - defined after model class to avoid circular imports
+task_dependency = None
 
 
 class TaskModel(BaseModel):
@@ -37,19 +29,20 @@ class TaskModel(BaseModel):
     completed_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
     project = relationship("ProjectModel", back_populates="tasks")
     
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("agent.id", ondelete="SET NULL"), nullable=True)
     agent = relationship("AgentModel", back_populates="tasks")
     
-    # Task dependencies
+    # Task dependencies - using string references to avoid circular imports
+    # The actual secondary table is defined after all models
     dependencies = relationship(
         "TaskModel",
-        secondary=task_dependency,
-        primaryjoin=id == task_dependency.c.dependent_task_id,
-        secondaryjoin=id == task_dependency.c.dependency_task_id,
-        backref="dependents",
+        secondary="task_dependency",
+        primaryjoin="TaskModel.id == task_dependency.c.dependent_task_id",
+        secondaryjoin="TaskModel.id == task_dependency.c.dependency_task_id",
+        backref="dependents"
     )
     
     # Result data
@@ -57,3 +50,17 @@ class TaskModel(BaseModel):
     
     def __repr__(self):
         return f"<Task(id={self.id}, name='{self.name}', status='{self.status}', priority={self.priority})>"
+
+
+# Define the task dependency table after model class to avoid circular imports
+# Import Base directly to avoid using BaseModel.metadata which conflicts with SQLAlchemy's reserved name
+from ..database import Base
+
+task_dependency = Table(
+    'task_dependencies',
+    Base.metadata,  # Use Base.metadata instead of BaseModel.metadata
+    Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+    Column('dependent_task_id', UUID(as_uuid=True), ForeignKey('task.id', ondelete="CASCADE"), nullable=False),
+    Column('dependency_task_id', UUID(as_uuid=True), ForeignKey('task.id', ondelete="CASCADE"), nullable=False),
+    Column('dependency_type', String(20), nullable=False, default="FINISH_TO_START"),
+)

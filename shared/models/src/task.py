@@ -75,8 +75,10 @@ class TaskInDB(TaskBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class Task(TaskInDB):
@@ -93,8 +95,10 @@ class TaskSummary(BaseModel):
     agent_id: Optional[UUID] = None
     due_date: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class TaskWithDependencies(Task):

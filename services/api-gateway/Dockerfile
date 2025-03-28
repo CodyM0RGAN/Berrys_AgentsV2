@@ -9,8 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY src/ ./src/
 
-# Copy shared modules
-COPY shared/ ./shared/
+# Shared modules are mounted as a volume
 
 # Set environment variables
 ENV PYTHONPATH=/app

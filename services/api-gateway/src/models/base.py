@@ -4,7 +4,7 @@ from sqlalchemy.sql import func
 from datetime import datetime
 import re
 
-from shared.utils.src.database import Base
+from ..database import Base
 
 
 class BaseModel(Base):

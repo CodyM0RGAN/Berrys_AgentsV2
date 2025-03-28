@@ -1,6 +1,9 @@
 @echo off
 echo Setting up development environment...
 
+:: Set up PYTHONPATH to include project root
+call %~dp0\..\setup-env.bat
+
 :: Create Python virtual environment if it doesn't exist
 if not exist venv (
     echo Creating Python virtual environment...

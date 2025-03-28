@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"sqltools.connections": [
+			{
+				"previewLimit": 50,
+				"server": "localhost",
+				"port": 5432,
+				"driver": "PostgreSQL",
+				"name": "mas_framework",
+				"database": "mas_framework",
+				"username": "sa",
+				"password": "8308chris"
+			}
+		]
+	}
+}

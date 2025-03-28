@@ -1,0 +1,78 @@
+# Flask and extensions
+Flask==2.3.3
+Flask-Login==0.6.2
+Flask-WTF==1.1.1
+Flask-SQLAlchemy==3.0.5
+Flask-Migrate==4.0.4
+Flask-Session==0.5.0
+Flask-SocketIO==5.3.4
+Flask-Mail==0.9.1  # For email functionality
+Flask-Caching==2.0.2  # For caching frequently accessed data
+Werkzeug==2.3.7
+Jinja2==3.1.2
+itsdangerous==2.1.2
+gunicorn==21.2.0
+
+# Database
+SQLAlchemy==2.0.20
+alembic==1.12.0
+psycopg2-binary==2.9.6  # Required for PostgreSQL connections
+asyncpg==0.29.0  # Required for async PostgreSQL connections
+
+# HTTP and API
+requests==2.31.0
+urllib3==2.0.4
+python-dotenv==1.0.0
+pydantic>=2.0.0  # Updated to v2 for compatibility with shared code
+pydantic-settings>=2.0.0  # Required for settings management with Pydantic v2
+httpx==0.25.0  # For async HTTP requests
+tenacity==8.2.3  # For retries in API calls
+python-multipart==0.0.6  # For handling multipart/form-data
+
+# FastAPI (required for shared code)
+fastapi>=0.100.0  # Version compatible with pydantic v2
+uvicorn>=0.23.0  # ASGI server for FastAPI
+starlette>=0.27.0  # Web framework that FastAPI is built on
+
+# WebSockets
+eventlet==0.33.3
+gevent==23.7.0
+gevent-websocket==0.10.1
+
+# Forms and validation
+WTForms==3.0.1
+email-validator==2.1.0  # Updated for compatibility
+
+# Security
+bcrypt==4.0.1
+PyJWT==2.8.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+Babel==2.12.1
+Markdown==3.4.4
+bleach==6.0.0
+ujson==5.8.0  # Fast JSON parsing
+jsonschema>=4.18.0  # For validation (version compatible with pydantic v2)
+redis==4.6.0  # For session storage and caching
+aiodns==3.1.1  # For async DNS resolution
+
+# Testing
+pytest==7.4.0
+pytest-flask==1.2.0
+coverage==7.3.1
+
+# Development
+black==23.7.0
+flake8==6.1.0
+isort==5.12.0
+
+# Data Visualization (for planned features)
+matplotlib==3.7.2  # For creating charts and graphs
+plotly==5.16.0  # For interactive visualizations
+
+# Authentication
+python-jose==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1

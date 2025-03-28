@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-{% if task %}edit{% else %}plus-circle{% endif %} me-2"></i>
+                        {% if task %}Edit{% else %}New{% endif %} Task
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST"
+                        action="{{ url_for('edit_task', task_id=task.id) if task else url_for('new_task', plan_id=plan_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="plan_id" value="{{ plan_id }}">
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Task Name</label>
+                            <input type="text" class="form-control" id="name" name="name"
+                                value="{{ task.name if task else '' }}" required autofocus>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="4"
+                                required>{{ task.description if task else '' }}</textarea>
+                            <div class="form-text">Provide a detailed description of the task.</div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="PENDING" {% if task and task.status=='PENDING' %}selected{% endif %}>
+                                        Pending</option>
+                                    <option value="IN_PROGRESS" {% if task and task.status=='IN_PROGRESS' %}selected{%
+                                        endif %}>In Progress</option>
+                                    <option value="COMPLETED" {% if task and task.status=='COMPLETED' %}selected{% endif
+                                        %}>Completed</option>
+                                    <option value="BLOCKED" {% if task and task.status=='BLOCKED' %}selected{% endif %}>
+                                        Blocked</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="priority" class="form-label">Priority</label>
+                                <select class="form-select" id="priority" name="priority" required>
+                                    <option value="LOW" {% if task and task.priority=='LOW' %}selected{% endif %}>Low
+                                    </option>
+                                    <option value="MEDIUM" {% if task and task.priority=='MEDIUM' %}selected{% endif %}>
+                                        Medium</option>
+                                    <option value="HIGH" {% if task and task.priority=='HIGH' %}selected{% endif %}>High
+                                    </option>
+                                    <option value="CRITICAL" {% if task and task.priority=='CRITICAL' %}selected{% endif
+                                        %}>Critical</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="estimated_duration" class="form-label">Estimated Duration (days)</label>
+                                <input type="number" class="form-control" id="estimated_duration"
+                                    name="estimated_duration" min="0.5" step="0.5"
+                                    value="{{ task.estimated_duration if task else 1 }}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="due_date" class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="due_date" name="due_date"
+                                    value="{{ task.due_date if task else '' }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="assigned_to" class="form-label">Assigned To</label>
+                            <select class="form-select" id="assigned_to" name="assigned_to">
+                                <option value="">-- Unassigned --</option>
+                                {% for agent in agents %}
+                                <option value="{{ agent.id }}" {% if task and task.assigned_agent_id==agent.id
+                                    %}selected{% endif %}>{{ agent.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="dependencies" class="form-label">Dependencies</label>
+                            <select class="form-select" id="dependencies" name="dependencies" multiple>
+                                {% for other_task in tasks %}
+                                {% if not task or other_task.id != task.id %}
+                                <option value="{{ other_task.id }}" {% if task and other_task.id in task.dependencies
+                                    %}selected{% endif %}>{{ other_task.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Select tasks that must be completed before this task can start.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="acceptance_criteria" class="form-label">Acceptance Criteria</label>
+                            <textarea class="form-control" id="acceptance_criteria" name="acceptance_criteria"
+                                rows="3">{{ task.acceptance_criteria if task else '' }}</textarea>
+                            <div class="form-text">Define the criteria that must be met for this task to be considered
+                                complete.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="tags" class="form-label">Tags (Optional)</label>
+                            <input type="text" class="form-control" id="tags" name="tags"
+                                placeholder="Enter tags separated by commas" value="{{ task.tags if task else '' }}">
+                            <div class="form-text">Example: frontend, backend, documentation</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('plan_detail', plan_id=plan_id) }}"
+                                class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-2"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i> {% if task %}Update{% else %}Create{% endif %} Task
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize multiple select for dependencies
+    document.addEventListener('DOMContentLoaded', function () {
+        // You can add a library like Select2 here for better UX
+        // For now, we'll use the native multiple select
+    });
+</script>
+{% endblock %}

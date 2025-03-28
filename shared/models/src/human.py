@@ -46,8 +46,10 @@ class HumanInteraction(BaseModel):
     response_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+        "protected_namespaces": ()
+    }
 
 
 class ApprovalRequest(BaseModel):

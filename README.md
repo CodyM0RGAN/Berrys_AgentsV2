@@ -83,18 +83,27 @@ The framework is built using a microservices architecture with the following com
 
 ### Development Setup
 
-1. Install backend dependencies:
+1. Set up the environment (this sets the PYTHONPATH to include the project root):
+   ```bash
+   # Windows
+   setup-env.bat
+   
+   # Linux/Mac
+   source setup-env.sh
+   ```
+
+2. Install backend dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. Install frontend dependencies:
+3. Install frontend dependencies:
    ```bash
    cd services/web-dashboard
    npm install
    ```
 
-3. Run the services individually for development:
+4. Run the services individually for development:
    ```bash
    # API Gateway
    cd services/api-gateway
@@ -104,6 +113,8 @@ The framework is built using a microservices architecture with the following com
    cd services/web-dashboard
    npm run dev
    ```
+
+   Note: If you're running into import errors, make sure your PYTHONPATH includes the project root directory.
 
 ## Project Structure
 
@@ -123,7 +134,22 @@ project-mas-framework/
 │   ├── project-coordinator/
 │   └── web-dashboard/
 └── docs/
+    ├── architecture.md
+    ├── api.md
+    ├── docker-best-practices.md
+    └── getting-started.md
 ```
+
+## Documentation
+
+For comprehensive documentation, please refer to:
+
+- [Project Guide](PROJECT_GUIDE.md): Quick overview of the project structure and documentation
+- [Documentation Home](docs/README.md): Comprehensive documentation entry point
+- [Claude Agent Guide](docs/CLAUDE_AGENT_GUIDE.md): Onboarding guide for Claude agents working on the project
+- [System Overview](docs/architecture/system-overview.md): Detailed system architecture
+- [Developer Guides](docs/developer-guides/index.md): Guides for developers
+- [API Reference](docs/reference/api.md): API documentation for service endpoints
 
 ## Contributing
 

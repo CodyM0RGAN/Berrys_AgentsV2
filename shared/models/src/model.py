@@ -40,6 +40,10 @@ class ModelBase(BaseModel):
     cost_per_1k_input: Optional[float] = None
     cost_per_1k_output: Optional[float] = None
     is_local: bool
+    
+    model_config = {
+        "protected_namespaces": ()
+    }
 
 
 class ModelCreate(ModelBase):
@@ -62,8 +66,10 @@ class ModelInDB(ModelBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "protected_namespaces": (),
+        "from_attributes": True
+    }
 
 
 class Model(ModelInDB):
@@ -79,8 +85,10 @@ class ModelSummary(BaseModel):
     is_local: bool
     status: ModelStatus
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "protected_namespaces": (),
+        "from_attributes": True
+    }
 
 
 class ModelRequest(BaseModel):
@@ -93,6 +101,10 @@ class ModelRequest(BaseModel):
     response_format: Optional[Dict[str, Any]] = None
     task_type: Optional[str] = None
     constraints: Optional[Dict[str, Any]] = None
+    
+    model_config = {
+        "protected_namespaces": ()
+    }
 
 
 class ModelResponse(BaseModel):
@@ -102,6 +114,10 @@ class ModelResponse(BaseModel):
     usage: Dict[str, int]
     latency_ms: int
     metrics: Dict[str, Any] = Field(default_factory=dict)
+    
+    model_config = {
+        "protected_namespaces": ()
+    }
 
 
 class ModelPerformanceMetric(BaseModel):
@@ -114,6 +130,10 @@ class ModelPerformanceMetric(BaseModel):
     output_tokens: int
     error_message: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    model_config = {
+        "protected_namespaces": ()
+    }
 
 
 class ModelUsage(BaseModel):
@@ -126,6 +146,10 @@ class ModelUsage(BaseModel):
     output_tokens: int
     cost: Optional[float] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    model_config = {
+        "protected_namespaces": ()
+    }
 
 
 class ModelBudget(BaseModel):
@@ -136,3 +160,7 @@ class ModelBudget(BaseModel):
     current_usage: float = 0.0
     last_reset: datetime = Field(default_factory=datetime.utcnow)
     alert_percentage: int = 80
+    
+    model_config = {
+        "protected_namespaces": ()
+    }

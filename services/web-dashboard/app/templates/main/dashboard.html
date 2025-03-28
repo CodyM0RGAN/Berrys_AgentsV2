@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Berry's Agents{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="mb-3">Dashboard</h1>
+            <p class="lead">Welcome to your project management dashboard.</p>
+        </div>
+    </div>
+
+    <!-- System Status -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">System Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="feature-icon bg-primary">
+                                        <i class="fas fa-server"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="mb-0">Status</h6>
+                                    <p class="mb-0 system-status">
+                                        {% if dashboard_data.system.status == 'Operational' %}
+                                        <span class="text-success"><i class="fas fa-check-circle me-2"></i>
+                                            Operational</span>
+                                        {% else %}
+                                        <span class="text-warning"><i class="fas fa-exclamation-circle me-2"></i> {{
+                                            dashboard_data.system.status }}</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="feature-icon bg-success">
+                                        <i class="fas fa-microchip"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="mb-0">CPU Usage</h6>
+                                    <div class="progress mt-2" style="height: 10px;">
+                                        <div class="progress-bar cpu-progress" role="progressbar"
+                                            style="width: {{ dashboard_data.system.resources.cpu }}%;"
+                                            aria-valuenow="{{ dashboard_data.system.resources.cpu }}" aria-valuemin="0"
+                                            aria-valuemax="100">{{ dashboard_data.system.resources.cpu }}%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="feature-icon bg-info">
+                                        <i class="fas fa-memory"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="mb-0">Memory Usage</h6>
+                                    <div class="progress mt-2" style="height: 10px;">
+                                        <div class="progress-bar memory-progress" role="progressbar"
+                                            style="width: {{ dashboard_data.system.resources.memory }}%;"
+                                            aria-valuenow="{{ dashboard_data.system.resources.memory }}"
+                                            aria-valuemin="0" aria-valuemax="100">{{
+                                            dashboard_data.system.resources.memory }}%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="feature-icon bg-warning">
+                                        <i class="fas fa-hdd"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="mb-0">Storage Usage</h6>
+                                    <div class="progress mt-2" style="height: 10px;">
+                                        <div class="progress-bar storage-progress" role="progressbar"
+                                            style="width: {{ dashboard_data.system.resources.storage }}%;"
+                                            aria-valuenow="{{ dashboard_data.system.resources.storage }}"
+                                            aria-valuemin="0" aria-valuemax="100">{{
+                                            dashboard_data.system.resources.storage }}%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    <small>System uptime: {{ dashboard_data.system.uptime }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Summary -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-4 mb-md-0">
+            <div class="card dashboard-card dashboard-card-primary h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title text-muted mb-0">Total Projects</h6>
+                            <h2 class="mt-2 mb-0 project-count">{{ dashboard_data.projects.total }}</h2>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-project-diagram fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <a href="{{ url_for('projects_list') }}" class="btn btn-sm btn-outline-primary">View All
+                            Projects</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4 mb-md-0">
+            <div class="card dashboard-card dashboard-card-warning h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title text-muted mb-0">Active Projects</h6>
+                            <h2 class="mt-2 mb-0 active-project-count">{{ dashboard_data.projects.active }}</h2>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-tasks fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <a href="{{ url_for('projects_list') }}?status=IN_PROGRESS"
+                            class="btn btn-sm btn-outline-warning">View Active Projects</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card dashboard-card dashboard-card-success h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title text-muted mb-0">Completed Projects</h6>
+                            <h2 class="mt-2 mb-0 completed-project-count">{{ dashboard_data.projects.completed }}</h2>
+                        </div>
+                        <div class="bg-success bg-opacity-10 p-3 rounded">
+                            <i class="fas fa-check-circle fa-2x text-success"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <a href="{{ url_for('projects_list') }}?status=COMPLETED"
+                            class="btn btn-sm btn-outline-success">View Completed Projects</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Projects -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-4 mb-md-0">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Recent Projects</h5>
+                    <a href="{{ url_for('projects_list') }}" class="btn btn-sm btn-light">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.projects.recent %}
+                    <div class="list-group">
+                        {% for project in dashboard_data.projects.recent %}
+                        <a href="{{ url_for('project_detail', project_id=project.id) }}"
+                            class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ project.name }}</h6>
+                                <span
+                                    class="badge bg-{{ 'success' if project.status == 'Completed' else 'primary' if project.status == 'In Progress' else 'secondary' }}">{{
+                                    project.status }}</span>
+                            </div>
+                            <div class="progress mt-2" style="height: 5px;">
+                                <div class="progress-bar" role="progressbar" style="width: {{ project.progress }}%;"
+                                    aria-valuenow="{{ project.progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <small class="text-muted">Progress: {{ project.progress }}%</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                        <p class="mb-0">No projects found.</p>
+                        <a href="{{ url_for('new_project') }}" class="btn btn-primary mt-3">Create New Project</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Activity -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Agent Activity</h5>
+                    <span class="badge bg-light text-dark">{{ dashboard_data.agents.active }} Active</span>
+                </div>
+                <div class="card-body">
+                    {% if dashboard_data.agents.recent_activity %}
+                    <div class="list-group">
+                        {% for agent in dashboard_data.agents.recent_activity %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ agent.name }}</h6>
+                                <span class="badge bg-{{ 'success' if agent.status == 'Active' else 'secondary' }}">{{
+                                    agent.status }}</span>
+                            </div>
+                            <p class="mb-1">{{ agent.task or 'No current task' }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+                        <p class="mb-0">No agent activity found.</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-muted">
+                    <small>Total Agents: <span class="agent-count">{{ dashboard_data.agents.total }}</span></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <a href="{{ url_for('new_project') }}" class="btn btn-primary w-100 py-3">
+                                <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                                <div>Create New Project</div>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <a href="{{ url_for('chat') }}" class="btn btn-success w-100 py-3">
+                                <i class="fas fa-comments fa-2x mb-2"></i>
+                                <div>Chat with Assistant</div>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3 mb-md-0">
+                            <a href="{{ url_for('projects_list') }}" class="btn btn-info w-100 py-3">
+                                <i class="fas fa-list fa-2x mb-2"></i>
+                                <div>View All Projects</div>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('settings_index') }}" class="btn btn-secondary w-100 py-3">
+                                <i class="fas fa-cog fa-2x mb-2"></i>
+                                <div>Settings</div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Set up auto-refresh if enabled
+        const refreshInterval = 60; // Refresh every 60 seconds
+
+        if (refreshInterval > 0) {
+            setInterval(function () {
+                fetch('/api/dashboard-data')
+                    .then(response => response.json())
+                    .then(data => {
+                        updateDashboardData(data);
+                    })
+                    .catch(error => {
+                        console.error('Dashboard refresh error:', error);
+                    });
+            }, refreshInterval * 1000);
+        }
+
+        function updateDashboardData(data) {
+            // Update system status
+            const systemStatus = document.querySelector('.system-status');
+            if (systemStatus) {
+                systemStatus.innerHTML = data.system.status === 'Operational'
+                    ? '<span class="text-success"><i class="fas fa-check-circle me-2"></i> Operational</span>'
+                    : `<span class="text-warning"><i class="fas fa-exclamation-circle me-2"></i> ${data.system.status}</span>`;
+            }
+
+            // Update resource usage
+            updateProgressBar('.cpu-progress', data.system.resources.cpu);
+            updateProgressBar('.memory-progress', data.system.resources.memory);
+            updateProgressBar('.storage-progress', data.system.resources.storage);
+
+            // Update counts
+            updateTextContent('.project-count', data.projects.total);
+            updateTextContent('.active-project-count', data.projects.active);
+            updateTextContent('.completed-project-count', data.projects.completed);
+            updateTextContent('.agent-count', data.agents.total);
+        }
+
+        function updateProgressBar(selector, value) {
+            const progressBar = document.querySelector(selector);
+            if (progressBar) {
+                progressBar.style.width = `${value}%`;
+                progressBar.setAttribute('aria-valuenow', value);
+                progressBar.textContent = `${value}%`;
+            }
+        }
+
+        function updateTextContent(selector, value) {
+            const element = document.querySelector(selector);
+            if (element) {
+                element.textContent = value;
+            }
+        }
+    });
+</script>
+{% endblock %}

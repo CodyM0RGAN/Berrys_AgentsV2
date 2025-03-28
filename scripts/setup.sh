@@ -8,6 +8,9 @@ set -e
 # Print commands
 set -x
 
+# Set up PYTHONPATH to include project root
+source "$(dirname "$0")/../setup-env.sh"
+
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     echo "Creating .env file from .env.example..."

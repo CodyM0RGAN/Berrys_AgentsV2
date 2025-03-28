@@ -1,25 +1,23 @@
 import os
-import sys
-import asyncio
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
-import logging
 import uvicorn
-
-# Add parent directory to path to import shared modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # Import shared modules
 from shared.utils.src.logging import setup_logging, get_logger
-from shared.utils.src.database import init_db, get_db, check_db_connection
 from shared.utils.src.auth import create_access_token, get_current_user, get_password_hash, verify_password
 from shared.utils.src.messaging import init_messaging, close_messaging, get_event_bus, get_command_bus
 
+# Import local modules
+from .database import get_db, check_db_connection, init_db
+
 # Import routers
-from .routers import projects, agents, tasks, tools, users, models, audit
+from .routers import projects
+# TODO: Uncomment these imports when the routers are implemented
+# from .routers import agents, tasks, tools, users, models, audit
 
 # Setup logging
 setup_logging(service_name="api-gateway")
@@ -27,7 +25,7 @@ logger = get_logger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="MAS Framework API",
+    title="Berry's Agents API",
     description="API Gateway for Project-based Multi-Agent System Framework",
     version="1.0.0",
 )
@@ -46,12 +44,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
 
 # Include routers
 app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
-app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
-app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
-app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
-app.include_router(users.router, prefix="/api/users", tags=["users"])
-app.include_router(models.router, prefix="/api/models", tags=["models"])
-app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+# TODO: Uncomment these lines when the routers are implemented
+# app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
+# app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
+# app.include_router(tools.router, prefix="/api/tools", tags=["tools"])
+# app.include_router(users.router, prefix="/api/users", tags=["users"])
+# app.include_router(models.router, prefix="/api/models", tags=["models"])
+# app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 
 @app.on_event("startup")

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Berry's Agents{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-5">
+        <div class="col-md-12 text-center">
+            <h1 class="display-4 mb-3">Welcome to Berry's Agents</h1>
+            <p class="lead">A powerful platform for managing AI-powered projects and agents.</p>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-md-6 offset-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center p-5">
+                    <h2 class="mb-4">Get Started</h2>
+                    <p class="mb-4">Access your dashboard to manage projects or chat with our AI assistant to create new
+                        projects.</p>
+                    <div class="d-grid gap-3 d-md-flex justify-content-md-center">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                        </a>
+                        <a href="{{ url_for('chat') }}" class="btn btn-success btn-lg">
+                            <i class="fas fa-comments me-2"></i> Chat
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-md-12">
+            <h2 class="text-center mb-4">Key Features</h2>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-primary mx-auto mb-3">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h4>AI Agents</h4>
+                    <p>Leverage specialized AI agents to handle different aspects of your projects, from planning to
+                        execution.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-success mx-auto mb-3">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                    <h4>Project Management</h4>
+                    <p>Track and manage your projects with comprehensive dashboards and detailed progress reports.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="feature-icon bg-info mx-auto mb-3">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <h4>Natural Language Interface</h4>
+                    <p>Interact with the system using natural language to create and manage projects effortlessly.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card bg-light">
+                <div class="card-body p-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h3>Ready to get started?</h3>
+                            <p class="mb-md-0">Create your first project and experience the power of AI-assisted project
+                                management.</p>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <a href="{{ url_for('new_project') }}" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus-circle me-2"></i> Create Project
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

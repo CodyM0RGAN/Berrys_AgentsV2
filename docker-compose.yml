@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -9,11 +7,13 @@ services:
       POSTGRES_DB: ${DB_NAME:-mas_framework}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./shared/database/multi_db_setup.sql:/docker-entrypoint-initdb.d/multi_db_setup.sql
       - ./shared/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./shared/database/init_all_dbs.sh:/docker-entrypoint-initdb.d/init_all_dbs.sh
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${DB_USER:-postgres}"]
+      test: [ "CMD", "pg_isready", "-U", "${DB_USER:-postgres}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,7 +27,7 @@ services:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_NAME:-mas_framework}
-    command: ["psql", "-h", "postgres", "-U", "${DB_USER:-postgres}", "-d", "${DB_NAME:-mas_framework}", "-c", "CREATE EXTENSION IF NOT EXISTS vector;"]
+    command: [ "psql", "-h", "postgres", "-U", "${DB_USER:-postgres}", "-d", "${DB_NAME:-mas_framework}", "-c", "CREATE EXTENSION IF NOT EXISTS vector;" ]
 
   redis:
     image: redis:alpine
@@ -46,13 +46,16 @@ services:
   api-gateway:
     build:
       context: ./services/api-gateway
+      dockerfile: Dockerfile
+    volumes:
+      - ./shared:/app/shared
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - DATABASE_URL=${ASYNC_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework}
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=${JWT_SECRET}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=DEVELOPMENT
     depends_on:
       - postgres
       - redis
@@ -60,24 +63,34 @@ services:
   agent-orchestrator:
     build:
       context: ./services/agent-orchestrator
+    volumes:
+      - ./shared:/app/shared
+    ports:
+      - "8001:8000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - DATABASE_URL=${ASYNC_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework}
       - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-your-default-secret-key}
       - MODEL_ORCHESTRATION_URL=http://model-orchestration:8000
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=DEVELOPMENT
     depends_on:
       - postgres
       - redis
-      - model-orchestration
+      - ollama
 
   planning-system:
     build:
       context: ./services/planning-system
+    volumes:
+      - ./shared:/app/shared
+    ports:
+      - "8002:8000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - DATABASE_URL=${ASYNC_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework}
       - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-your-default-secret-key}
       - MODEL_ORCHESTRATION_URL=http://model-orchestration:8000
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=DEVELOPMENT
     depends_on:
       - postgres
       - redis
@@ -86,13 +99,18 @@ services:
   model-orchestration:
     build:
       context: ./services/model-orchestration
+    volumes:
+      - ./shared:/app/shared
+    ports:
+      - "8003:8000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - DATABASE_URL=${ASYNC_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework}
       - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-your-default-secret-key}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OLLAMA_URL=http://ollama:11434
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=DEVELOPMENT
     depends_on:
       - postgres
       - redis
@@ -101,11 +119,16 @@ services:
   tool-integration:
     build:
       context: ./services/tool-integration
+    volumes:
+      - ./shared:/app/shared
+    ports:
+      - "8004:8000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - DATABASE_URL=${ASYNC_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework}
       - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-your-default-secret-key}
       - MODEL_ORCHESTRATION_URL=http://model-orchestration:8000
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=DEVELOPMENT
     depends_on:
       - postgres
       - redis
@@ -114,13 +137,19 @@ services:
   project-coordinator:
     build:
       context: ./services/project-coordinator
+    volumes:
+      - ./shared:/app/shared
+    ports:
+      - "8005:8000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-mas_framework}
+      - DATABASE_URL=${ASYNC_DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/mas_framework}
+      - SYNC_DATABASE_URL=${SYNC_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/mas_framework}
       - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=${JWT_SECRET:-your-default-secret-key}
       - AGENT_ORCHESTRATOR_URL=http://agent-orchestrator:8000
       - PLANNING_SYSTEM_URL=http://planning-system:8000
       - TOOL_INTEGRATION_URL=http://tool-integration:8000
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENVIRONMENT=DEVELOPMENT
     depends_on:
       - postgres
       - redis
@@ -131,13 +160,39 @@ services:
   web-dashboard:
     build:
       context: ./services/web-dashboard
+    volumes:
+      - ./shared:/app/shared
     ports:
-      - "3000:3000"
+      - "5000:5000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000/api
-      - NODE_ENV=${ENVIRONMENT:-development}
+      # Point internal API calls to the correct service names within Docker network
+      # Remove /api suffix as routers are included directly at the root or specific prefixes
+      - AGENT_ORCHESTRATOR_API_URL=http://agent-orchestrator:8000
+      - PROJECT_COORDINATOR_API_URL=http://project-coordinator:8000
+      - MODEL_ORCHESTRATION_API_URL=http://model-orchestration:8000
+      - API_GATEWAY_URL=http://api-gateway:8000
+
+      # Other existing variables
+      - REACT_APP_API_URL=http://localhost:8000/api # This seems for React frontend, keep as localhost? Check usage. Assuming okay for now.
+      - NODE_ENV=${ENVIRONMENT:-DEVELOPMENT}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${JWT_SECRET:-your-default-secret-key}
+      - FLASK_CONFIG=development # Changed from production for debugging? Revert if needed.
+      - AUTH_ENABLED=False
+      - ENABLE_PROJECTS=True
+      - ENABLE_AGENTS=True
+      - ENABLE_TASKS=True
+      - ENABLE_TOOLS=True
+      - ENABLE_MODELS=True
+      - SQLALCHEMY_DATABASE_URI=${SYNC_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/mas_framework} # Standardized DB URI
+      - LOG_LEVEL=DEBUG # Added for better logging
     depends_on:
+      - postgres
       - api-gateway
+      # Add dependencies for the services it calls
+      - project-coordinator
+      - agent-orchestrator
+      - model-orchestration
 
 volumes:
   postgres_data:

@@ -24,7 +24,7 @@ class AuditLogModel(BaseModel):
     new_state = Column(JSON, nullable=True)
     
     # Actor
-    actor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    actor_id = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     actor = relationship("UserModel")
     
     def __repr__(self):
@@ -84,7 +84,7 @@ class OptimizationImplementationModel(BaseModel):
     suggestion = relationship("OptimizationSuggestionModel")
     
     implementation_details = Column(JSON, nullable=False)
-    implemented_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    implemented_by = Column(UUID(as_uuid=True), ForeignKey("user.id", ondelete="SET NULL"), nullable=True)
     implementer = relationship("UserModel")
     
     result_metrics = Column(JSON, nullable=True)

@@ -11,6 +11,8 @@ class AIModelModel(BaseModel):
     SQLAlchemy model for AI models.
     """
     
+    __tablename__ = 'ai_model'
+    
     # Primary key (using model ID as primary key)
     id = Column(String(100), primary_key=True)
     
@@ -72,9 +74,9 @@ class ModelUsageModel(BaseModel):
     
     # Usage details
     model_id = Column(String(100), ForeignKey("ai_model.id", ondelete="CASCADE"), nullable=False)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
-    task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("project.id", ondelete="SET NULL"), nullable=True)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("agent.id", ondelete="SET NULL"), nullable=True)
+    task_id = Column(UUID(as_uuid=True), ForeignKey("task.id", ondelete="SET NULL"), nullable=True)
     
     # Token usage
     input_tokens = Column(Integer, nullable=False)
@@ -97,7 +99,7 @@ class ModelBudgetModel(BaseModel):
     id = Column(String(100), primary_key=True)
     
     # Budget details
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("project.id", ondelete="CASCADE"), nullable=True)
     monthly_limit = Column(Float, nullable=False)
     current_usage = Column(Float, nullable=False, default=0.0)
     last_reset = Column(DateTime(timezone=True), nullable=False)

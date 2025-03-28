@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-edit me-2"></i> Edit Project
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('edit_project', project_id=project.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Project Name</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ project.name }}"
+                                required autofocus>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="4"
+                                required>{{ project.description }}</textarea>
+                            <div class="form-text">Provide a detailed description of the project goals and requirements.
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status" required>
+                                    <option value="Planning" {% if project.status=='Planning' %}selected{% endif %}>
+                                        Planning</option>
+                                    <option value="In Progress" {% if project.status=='In Progress' %}selected{% endif
+                                        %}>In Progress</option>
+                                    <option value="Completed" {% if project.status=='Completed' %}selected{% endif %}>
+                                        Completed</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="progress" class="form-label">Progress (%)</label>
+                                <input type="number" class="form-control" id="progress" name="progress" min="0"
+                                    max="100" value="{{ project.progress }}" required>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Assign Agents</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent1" name="agents"
+                                            value="1" {% if 1 in project.agent_ids %}checked{% endif %}>
+                                        <label class="form-check-label" for="agent1">
+                                            Code Generator
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent2" name="agents"
+                                            value="2" {% if 2 in project.agent_ids %}checked{% endif %}>
+                                        <label class="form-check-label" for="agent2">
+                                            Data Analyzer
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent3" name="agents"
+                                            value="3" {% if 3 in project.agent_ids %}checked{% endif %}>
+                                        <label class="form-check-label" for="agent3">
+                                            QA Tester
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="agent4" name="agents"
+                                            value="4" {% if 4 in project.agent_ids %}checked{% endif %}>
+                                        <label class="form-check-label" for="agent4">
+                                            Documentation Writer
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="deadline" class="form-label">Deadline (Optional)</label>
+                            <input type="date" class="form-control" id="deadline" name="deadline"
+                                value="{{ project.deadline }}">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="priority" class="form-label">Priority</label>
+                            <select class="form-select" id="priority" name="priority" required>
+                                <option value="Low" {% if project.priority=='Low' %}selected{% endif %}>Low</option>
+                                <option value="Medium" {% if project.priority=='Medium' %}selected{% endif %}>Medium
+                                </option>
+                                <option value="High" {% if project.priority=='High' %}selected{% endif %}>High</option>
+                                <option value="Urgent" {% if project.priority=='Urgent' %}selected{% endif %}>Urgent
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="tags" class="form-label">Tags (Optional)</label>
+                            <input type="text" class="form-control" id="tags" name="tags"
+                                placeholder="Enter tags separated by commas" value="{{ project.tags }}">
+                            <div class="form-text">Example: web, database, api</div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('project_detail', project_id=project.id) }}"
+                                class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-2"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card shadow mt-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i> Danger Zone
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p>Permanently delete this project and all of its data.</p>
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal"
+                        data-bs-target="#deleteModal">
+                        <i class="fas fa-trash-alt me-2"></i> Delete Project
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the project "{{ project.name }}"? This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ url_for('delete_project', project_id=project.id) }}" method="POST"
+                        class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Update progress based on status
+    document.getElementById('status').addEventListener('change', function () {
+        const status = this.value;
+        const progressInput = document.getElementById('progress');
+
+        if (status === 'Planning') {
+            progressInput.value = 0;
+        } else if (status === 'In Progress') {
+            progressInput.value = 50;
+        } else if (status === 'Completed') {
+            progressInput.value = 100;
+        }
+    });
+
+    // Validate progress value
+    document.getElementById('progress').addEventListener('input', function () {
+        const value = parseInt(this.value);
+        if (isNaN(value)) {
+            this.value = 0;
+        } else if (value < 0) {
+            this.value = 0;
+        } else if (value > 100) {
+            this.value = 100;
+        }
+    });
+</script>
+{% endblock %}

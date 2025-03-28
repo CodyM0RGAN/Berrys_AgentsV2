@@ -38,7 +38,7 @@ class ToolBase(BaseModel):
     capability: str
     source: ToolSource
     documentation_url: Optional[str] = None
-    schema: Optional[Dict[str, Any]] = None
+    tool_schema: Optional[Dict[str, Any]] = None
     integration_type: Optional[IntegrationType] = None
 
 
@@ -52,7 +52,7 @@ class ToolUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     documentation_url: Optional[str] = None
-    schema: Optional[Dict[str, Any]] = None
+    tool_schema: Optional[Dict[str, Any]] = None
     integration_type: Optional[IntegrationType] = None
     status: Optional[ToolStatus] = None
 
@@ -65,7 +65,7 @@ class ToolInDB(ToolBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Tool(ToolInDB):
@@ -82,7 +82,7 @@ class ToolSummary(BaseModel):
     status: ToolStatus
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class AgentTool(BaseModel):
