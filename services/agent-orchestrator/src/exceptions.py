@@ -317,3 +317,58 @@ class PatternNotFoundError(ServiceError):
         message = message or f"Collaboration pattern with ID {pattern_id} not found"
         details = details or {"pattern_id": str(pattern_id)}
         super().__init__(message, code, status.HTTP_404_NOT_FOUND, details)
+
+
+# Generic exceptions for template management service
+
+class NotFoundException(ServiceError):
+    """
+    Generic exception for resource not found errors.
+    """
+    def __init__(
+        self,
+        message: str,
+        code: str = "not_found",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(message, code, status.HTTP_404_NOT_FOUND, details)
+
+
+class AlreadyExistsException(ServiceError):
+    """
+    Generic exception for resource already exists errors.
+    """
+    def __init__(
+        self,
+        message: str,
+        code: str = "already_exists",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(message, code, status.HTTP_409_CONFLICT, details)
+
+
+class ValidationException(ServiceError):
+    """
+    Generic exception for validation errors.
+    """
+    def __init__(
+        self,
+        message: str,
+        code: str = "validation_error",
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(message, code, status.HTTP_400_BAD_REQUEST, details)
+
+
+class ServiceException(ServiceError):
+    """
+    Generic exception for service errors.
+    """
+    def __init__(
+        self,
+        message: str,
+        code: str = "service_error",
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        details: Optional[Dict[str, Any]] = None,
+    ):
+        super().__init__(message, code, status_code, details)

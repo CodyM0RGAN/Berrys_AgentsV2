@@ -1,0 +1,703 @@
+name: Monitoring Template
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+        description: 'Name of the service to monitor'
+      environment:
+        required: false
+        type: string
+        default: 'development'
+        description: 'Environment to monitor (development, qa, production)'
+      deploy_url:
+        required: true
+        type: string
+        description: 'URL of the deployed service'
+      verify_health:
+        required: false
+        type: boolean
+        default: true
+        description: 'Whether to verify service health'
+      verify_metrics:
+        required: false
+        type: boolean
+        default: true
+        description: 'Whether to verify service metrics'
+      verify_performance:
+        required: false
+        type: boolean
+        default: true
+        description: 'Whether to verify service performance'
+      enable_canary:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to enable canary deployment monitoring'
+      canary_url:
+        required: false
+        type: string
+        default: ''
+        description: 'URL of the canary deployment'
+      production_url:
+        required: false
+        type: string
+        default: ''
+        description: 'URL of the production deployment'
+      performance_threshold:
+        required: false
+        type: number
+        default: 1.2
+        description: 'Threshold for performance degradation (e.g., 1.2 means 20% degradation is allowed)'
+      monitor_duration:
+        required: false
+        type: number
+        default: 300
+        description: 'Duration in seconds to monitor the deployment'
+    
+    outputs:
+      verification_success:
+        description: 'Whether the verification was successful'
+        value: ${{ jobs.verify_deployment.outputs.verification_success }}
+      canary_success:
+        description: 'Whether the canary deployment was successful'
+        value: ${{ jobs.monitor_canary.outputs.canary_success }}
+
+jobs:
+  verify_deployment:
+    name: Verify ${{ inputs.service_name }} Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      verification_success: ${{ steps.verification_results.outputs.verification_success }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pytest
+      
+      - name: Wait for service to be ready
+        run: |
+          echo "Waiting for service to be ready at ${{ inputs.deploy_url }}..."
+          max_retries=10
+          retry_count=0
+          retry_delay=5
+          
+          while [ $retry_count -lt $max_retries ]; do
+            if curl --silent --fail ${{ inputs.deploy_url }}/health > /dev/null; then
+              echo "Service is ready!"
+              exit 0
+            fi
+            
+            echo "Service not ready yet, retrying in ${retry_delay} seconds..."
+            sleep $retry_delay
+            retry_count=$((retry_count + 1))
+          done
+          
+          echo "Service did not become ready after $max_retries attempts"
+          exit 1
+      
+      - name: Verify deployment
+        id: verify
+        run: |
+          echo "Verifying deployment of ${{ inputs.service_name }} at ${{ inputs.deploy_url }}..."
+          
+          # Create verification script
+          cat > verify_deployment.py << 'EOF'
+          import json
+          import sys
+          import os
+          import requests
+          import time
+          
+          def verify_deployment(
+              service_name,
+              base_url,
+              verify_health=True,
+              verify_metrics=True,
+              verify_performance=True,
+              timeout=60,
+              retries=3,
+              retry_delay=5
+          ):
+              print(f"Verifying deployment of {service_name} at {base_url}")
+              
+              results = {
+                  "service": service_name,
+                  "base_url": base_url,
+                  "timestamp": time.time(),
+                  "overall_status": "unknown",
+                  "checks": [],
+              }
+              
+              # Verify health
+              if verify_health:
+                  health_result = verify_health_endpoint(base_url, timeout, retries, retry_delay)
+                  results["checks"].append(health_result)
+              
+              # Verify metrics
+              if verify_metrics:
+                  metrics_result = verify_metrics_endpoint(base_url, timeout, retries, retry_delay)
+                  results["checks"].append(metrics_result)
+              
+              # Verify performance
+              if verify_performance:
+                  performance_result = verify_performance_endpoint(base_url, timeout, retries, retry_delay)
+                  results["checks"].append(performance_result)
+              
+              # Determine overall status
+              if any(check["status"] == "failed" for check in results["checks"]):
+                  results["overall_status"] = "failed"
+              elif any(check["status"] == "warning" for check in results["checks"]):
+                  results["overall_status"] = "warning"
+              elif all(check["status"] == "passed" for check in results["checks"]):
+                  results["overall_status"] = "passed"
+              
+              success = results["overall_status"] in ["passed", "warning"]
+              
+              return success, results
+          
+          def verify_health_endpoint(base_url, timeout, retries, retry_delay):
+              print(f"Verifying health at {base_url}/health")
+              
+              for attempt in range(retries):
+                  try:
+                      response = requests.get(f"{base_url}/health", timeout=timeout)
+                      
+                      if response.status_code == 200:
+                          try:
+                              health_data = response.json()
+                              
+                              if health_data.get("status") == "healthy":
+                                  return {
+                                      "type": "health",
+                                      "name": "health_check",
+                                      "status": "passed",
+                                      "message": "Health check passed",
+                                      "data": health_data,
+                                  }
+                              else:
+                                  unhealthy_components = []
+                                  for component, info in health_data.get("components", {}).items():
+                                      if info.get("status") != "healthy":
+                                          unhealthy_components.append(component)
+                                  
+                                  return {
+                                      "type": "health",
+                                      "name": "health_check",
+                                      "status": "failed",
+                                      "message": f"Service is not healthy: {', '.join(unhealthy_components)}",
+                                      "data": health_data,
+                                  }
+                          except ValueError:
+                              return {
+                                  "type": "health",
+                                  "name": "health_check",
+                                  "status": "warning",
+                                  "message": "Health endpoint returned non-JSON response",
+                                  "data": {"response": response.text[:200]},
+                              }
+                      else:
+                          if attempt < retries - 1:
+                              print(f"Health check failed with status {response.status_code}, retrying in {retry_delay}s")
+                              time.sleep(retry_delay)
+                              continue
+                          
+                          return {
+                              "type": "health",
+                              "name": "health_check",
+                              "status": "failed",
+                              "message": f"Health check returned status code {response.status_code}",
+                              "data": {"status_code": response.status_code},
+                          }
+                  except requests.RequestException as e:
+                      if attempt < retries - 1:
+                          print(f"Health check failed with error: {str(e)}, retrying in {retry_delay}s")
+                          time.sleep(retry_delay)
+                          continue
+                      
+                      return {
+                          "type": "health",
+                          "name": "health_check",
+                          "status": "failed",
+                          "message": f"Health check failed with error: {str(e)}",
+                          "error": str(e),
+                      }
+              
+              return {
+                  "type": "health",
+                  "name": "health_check",
+                  "status": "failed",
+                  "message": f"Health check failed after {retries} attempts",
+              }
+          
+          def verify_metrics_endpoint(base_url, timeout, retries, retry_delay):
+              print(f"Verifying metrics at {base_url}/metrics")
+              
+              for attempt in range(retries):
+                  try:
+                      response = requests.get(f"{base_url}/metrics", timeout=timeout)
+                      
+                      if response.status_code == 200:
+                          try:
+                              metrics_data = response.json()
+                              
+                              if metrics_data:
+                                  return {
+                                      "type": "metrics",
+                                      "name": "metrics_check",
+                                      "status": "passed",
+                                      "message": "Metrics check passed",
+                                      "data": {"metric_count": len(metrics_data)},
+                                  }
+                              else:
+                                  return {
+                                      "type": "metrics",
+                                      "name": "metrics_check",
+                                      "status": "warning",
+                                      "message": "Metrics endpoint returned empty data",
+                                      "data": {},
+                                  }
+                          except ValueError:
+                              # Prometheus format metrics are not JSON
+                              if response.text:
+                                  metric_count = len(response.text.strip().split("\n"))
+                                  
+                                  return {
+                                      "type": "metrics",
+                                      "name": "metrics_check",
+                                      "status": "passed",
+                                      "message": "Prometheus metrics check passed",
+                                      "data": {"metric_count": metric_count},
+                                  }
+                              else:
+                                  return {
+                                      "type": "metrics",
+                                      "name": "metrics_check",
+                                      "status": "warning",
+                                      "message": "Metrics endpoint returned empty data",
+                                      "data": {},
+                                  }
+                      else:
+                          if attempt < retries - 1:
+                              print(f"Metrics check failed with status {response.status_code}, retrying in {retry_delay}s")
+                              time.sleep(retry_delay)
+                              continue
+                          
+                          return {
+                              "type": "metrics",
+                              "name": "metrics_check",
+                              "status": "failed",
+                              "message": f"Metrics check returned status code {response.status_code}",
+                              "data": {"status_code": response.status_code},
+                          }
+                  except requests.RequestException as e:
+                      if attempt < retries - 1:
+                          print(f"Metrics check failed with error: {str(e)}, retrying in {retry_delay}s")
+                          time.sleep(retry_delay)
+                          continue
+                      
+                      return {
+                          "type": "metrics",
+                          "name": "metrics_check",
+                          "status": "failed",
+                          "message": f"Metrics check failed with error: {str(e)}",
+                          "error": str(e),
+                      }
+              
+              return {
+                  "type": "metrics",
+                  "name": "metrics_check",
+                  "status": "failed",
+                  "message": f"Metrics check failed after {retries} attempts",
+              }
+          
+          def verify_performance_endpoint(base_url, timeout, retries, retry_delay):
+              print(f"Verifying performance at {base_url}/health")
+              
+              response_times = []
+              
+              for attempt in range(retries):
+                  try:
+                      start_time = time.time()
+                      response = requests.get(f"{base_url}/health", timeout=timeout)
+                      end_time = time.time()
+                      
+                      response_time = end_time - start_time
+                      response_times.append(response_time)
+                      
+                      if response.status_code == 200:
+                          continue
+                      else:
+                          if attempt < retries - 1:
+                              print(f"Performance check failed with status {response.status_code}, retrying in {retry_delay}s")
+                              time.sleep(retry_delay)
+                              continue
+                          
+                          return {
+                              "type": "performance",
+                              "name": "performance_check",
+                              "status": "failed",
+                              "message": f"Performance check returned status code {response.status_code}",
+                              "data": {"status_code": response.status_code},
+                          }
+                  except requests.RequestException as e:
+                      if attempt < retries - 1:
+                          print(f"Performance check failed with error: {str(e)}, retrying in {retry_delay}s")
+                          time.sleep(retry_delay)
+                          continue
+                      
+                      return {
+                          "type": "performance",
+                          "name": "performance_check",
+                          "status": "failed",
+                          "message": f"Performance check failed with error: {str(e)}",
+                          "error": str(e),
+                      }
+              
+              # Calculate average response time
+              avg_response_time = sum(response_times) / len(response_times)
+              
+              # Simple performance check
+              if avg_response_time > 2.0:
+                  return {
+                      "type": "performance",
+                      "name": "performance_check",
+                      "status": "failed",
+                      "message": f"Average response time too high: {avg_response_time:.3f}s",
+                      "data": {
+                          "response_times": response_times,
+                          "avg_response_time": avg_response_time,
+                      },
+                  }
+              elif avg_response_time > 1.0:
+                  return {
+                      "type": "performance",
+                      "name": "performance_check",
+                      "status": "warning",
+                      "message": f"Average response time high: {avg_response_time:.3f}s",
+                      "data": {
+                          "response_times": response_times,
+                          "avg_response_time": avg_response_time,
+                      },
+                  }
+              else:
+                  return {
+                      "type": "performance",
+                      "name": "performance_check",
+                      "status": "passed",
+                      "message": f"Performance check passed: {avg_response_time:.3f}s",
+                      "data": {
+                          "response_times": response_times,
+                          "avg_response_time": avg_response_time,
+                      },
+                  }
+          
+          if __name__ == "__main__":
+              service_name = sys.argv[1]
+              base_url = sys.argv[2]
+              verify_health = sys.argv[3].lower() == "true"
+              verify_metrics = sys.argv[4].lower() == "true"
+              verify_performance = sys.argv[5].lower() == "true"
+              
+              success, results = verify_deployment(
+                  service_name=service_name,
+                  base_url=base_url,
+                  verify_health=verify_health,
+                  verify_metrics=verify_metrics,
+                  verify_performance=verify_performance
+              )
+              
+              # Write results to file
+              with open("verification_results.json", "w") as f:
+                  json.dump(results, f, indent=2)
+              
+              # Output success status
+              print(f"Verification {'succeeded' if success else 'failed'}: {results['overall_status']}")
+              
+              # Exit with appropriate code
+              sys.exit(0 if success else 1)
+          EOF
+          
+          # Run the verification script
+          python verify_deployment.py \
+            "${{ inputs.service_name }}" \
+            "${{ inputs.deploy_url }}" \
+            "${{ inputs.verify_health }}" \
+            "${{ inputs.verify_metrics }}" \
+            "${{ inputs.verify_performance }}"
+          
+          VERIFY_EXIT_CODE=$?
+          echo "verify_exit_code=$VERIFY_EXIT_CODE" >> $GITHUB_OUTPUT
+      
+      - name: Upload verification results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: verification-results-${{ inputs.service_name }}-${{ inputs.environment }}
+          path: verification_results.json
+      
+      - name: Process verification results
+        id: verification_results
+        if: always()
+        run: |
+          echo "Processing verification results..."
+          
+          if [ -f "verification_results.json" ]; then
+            OVERALL_STATUS=$(jq -r '.overall_status' verification_results.json)
+            echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+            
+            if [ "$OVERALL_STATUS" == "passed" ] || [ "$OVERALL_STATUS" == "warning" ]; then
+              echo "verification_success=true" >> $GITHUB_OUTPUT
+              echo "Verification succeeded with status: $OVERALL_STATUS"
+            else
+              echo "verification_success=false" >> $GITHUB_OUTPUT
+              echo "Verification failed with status: $OVERALL_STATUS"
+            fi
+          else
+            echo "verification_success=false" >> $GITHUB_OUTPUT
+            echo "Verification results file not found"
+          fi
+  
+  monitor_canary:
+    name: Monitor ${{ inputs.service_name }} Canary
+    runs-on: ubuntu-latest
+    needs: verify_deployment
+    if: inputs.enable_canary == true && needs.verify_deployment.outputs.verification_success == 'true'
+    outputs:
+      canary_success: ${{ steps.canary_results.outputs.canary_success }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pytest
+      
+      - name: Monitor canary deployment
+        id: monitor_canary
+        run: |
+          echo "Monitoring canary deployment of ${{ inputs.service_name }}..."
+          
+          # Create monitoring script
+          cat > monitor_canary.py << 'EOF'
+          import json
+          import sys
+          import os
+          import requests
+          import time
+          import threading
+          
+          class CanaryMonitor:
+              def __init__(
+                  self,
+                  service_name,
+                  canary_url,
+                  production_url,
+                  threshold=1.2,
+                  duration=300,
+                  check_interval=10
+              ):
+                  self.service_name = service_name
+                  self.canary_url = canary_url
+                  self.production_url = production_url
+                  self.threshold = threshold
+                  self.duration = duration
+                  self.check_interval = check_interval
+                  
+                  self.canary_metrics = []
+                  self.production_metrics = []
+                  self.start_time = time.time()
+                  self.end_time = self.start_time + duration
+                  self.is_running = True
+                  self.thread = None
+              
+              def start(self):
+                  """Start monitoring the canary deployment."""
+                  self.thread = threading.Thread(target=self._monitor_loop)
+                  self.thread.daemon = True
+                  self.thread.start()
+                  
+                  # Wait for monitoring to complete
+                  while time.time() < self.end_time and self.is_running:
+                      time.sleep(1)
+                  
+                  self.is_running = False
+                  self.thread.join()
+                  
+                  return self.get_results()
+              
+              def _monitor_loop(self):
+                  """Main monitoring loop."""
+                  while time.time() < self.end_time and self.is_running:
+                      try:
+                          # Check canary
+                          canary_start = time.time()
+                          canary_response = requests.get(f"{self.canary_url}/health", timeout=10)
+                          canary_time = time.time() - canary_start
+                          
+                          # Check production
+                          prod_start = time.time()
+                          prod_response = requests.get(f"{self.production_url}/health", timeout=10)
+                          prod_time = time.time() - prod_start
+                          
+                          # Store metrics
+                          self.canary_metrics.append({
+                              "timestamp": time.time(),
+                              "response_time": canary_time,
+                              "status_code": canary_response.status_code,
+                          })
+                          
+                          self.production_metrics.append({
+                              "timestamp": time.time(),
+                              "response_time": prod_time,
+                              "status_code": prod_response.status_code,
+                          })
+                          
+                          # Log progress
+                          elapsed = time.time() - self.start_time
+                          remaining = self.end_time - time.time()
+                          print(f"Monitoring in progress: {elapsed:.0f}s elapsed, {remaining:.0f}s remaining")
+                          
+                          # Sleep until next check
+                          time.sleep(self.check_interval)
+                      except Exception as e:
+                          print(f"Error in monitoring loop: {str(e)}")
+                          time.sleep(self.check_interval)
+              
+              def get_results(self):
+                  """Get the monitoring results."""
+                  if not self.canary_metrics or not self.production_metrics:
+                      return {
+                          "service": self.service_name,
+                          "canary_url": self.canary_url,
+                          "production_url": self.production_url,
+                          "status": "failed",
+                          "message": "No metrics collected",
+                          "pass": False,
+                      }
+                  
+                  # Calculate average response times
+                  canary_avg = sum(m["response_time"] for m in self.canary_metrics) / len(self.canary_metrics)
+                  prod_avg = sum(m["response_time"] for m in self.production_metrics) / len(self.production_metrics)
+                  
+                  # Calculate performance ratio
+                  ratio = canary_avg / prod_avg if prod_avg > 0 else float('inf')
+                  percent_diff = (ratio - 1.0) * 100
+                  
+                  # Determine if canary passed
+                  passes = ratio <= self.threshold
+                  
+                  # Create result object
+                  result = {
+                      "service": self.service_name,
+                      "canary_url": self.canary_url,
+                      "production_url": self.production_url,
+                      "threshold": self.threshold,
+                      "canary_avg_response_time": canary_avg,
+                      "production_avg_response_time": prod_avg,
+                      "ratio": ratio,
+                      "percent_difference": percent_diff,
+                      "pass": passes,
+                      "status": "passed" if passes else "failed",
+                      "message": f"Canary {'is' if passes else 'is not'} performing acceptably",
+                      "canary_metrics": self.canary_metrics,
+                      "production_metrics": self.production_metrics,
+                  }
+                  
+                  return result
+          
+          if __name__ == "__main__":
+              service_name = sys.argv[1]
+              canary_url = sys.argv[2]
+              production_url = sys.argv[3]
+              threshold = float(sys.argv[4])
+              duration = int(sys.argv[5])
+              
+              print(f"Starting canary monitoring for {service_name}")
+              print(f"Canary URL: {canary_url}")
+              print(f"Production URL: {production_url}")
+              print(f"Threshold: {threshold}")
+              print(f"Duration: {duration}s")
+              
+              monitor = CanaryMonitor(
+                  service_name=service_name,
+                  canary_url=canary_url,
+                  production_url=production_url,
+                  threshold=threshold,
+                  duration=duration
+              )
+              
+              results = monitor.start()
+              
+              # Write results to file
+              with open("canary_results.json", "w") as f:
+                  json.dump(results, f, indent=2)
+              
+              # Output success status
+              status_msg = "passed" if results["pass"] else "failed"
+              print(f"Canary monitoring {status_msg}: {results['message']}")
+              
+              # Exit with appropriate code
+              sys.exit(0 if results["pass"] else 1)
+          EOF
+          
+          # Run the monitoring script
+          python monitor_canary.py \
+            "${{ inputs.service_name }}" \
+            "${{ inputs.canary_url }}" \
+            "${{ inputs.production_url }}" \
+            "${{ inputs.performance_threshold }}" \
+            "${{ inputs.monitor_duration }}"
+          
+          CANARY_EXIT_CODE=$?
+          echo "canary_exit_code=$CANARY_EXIT_CODE" >> $GITHUB_OUTPUT
+      
+      - name: Upload canary results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: canary-results-${{ inputs.service_name }}-${{ inputs.environment }}
+          path: canary_results.json
+      
+      - name: Process canary results
+        id: canary_results
+        if: always()
+        run: |
+          echo "Processing canary results..."
+          
+          if [ -f "canary_results.json" ]; then
+            CANARY_STATUS=$(jq -r '.status' canary_results.json)
+            CANARY_PASS=$(jq -r '.pass' canary_results.json)
+            echo "canary_status=$CANARY_STATUS" >> $GITHUB_OUTPUT
+            
+            if [ "$CANARY_PASS" == "true" ]; then
+              echo "canary_success=true" >> $GITHUB_OUTPUT
+              echo "Canary monitoring succeeded with status: $CANARY_STATUS"
+            else
+              echo "canary_success=false" >> $GITHUB_OUTPUT
+              echo "Canary monitoring failed with status: $CANARY_STATUS"
+            fi
+          else
+            echo "canary_success=false" >> $GITHUB_OUTPUT
+            echo "Canary results file not found"
+          fi

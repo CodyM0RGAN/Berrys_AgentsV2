@@ -1,10 +1,11 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: ankane/pgvector:latest
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_NAME:-mas_framework}
+      DB_HOST: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./shared/database/multi_db_setup.sql:/docker-entrypoint-initdb.d/multi_db_setup.sql

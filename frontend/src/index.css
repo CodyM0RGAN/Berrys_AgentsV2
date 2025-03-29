@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    color-scheme: light dark;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply m-0 flex min-h-screen min-w-[320px] bg-[#242424] text-[rgba(255, 255, 255, 0.87)];
+  }
+
+  @media (prefers-color-scheme: light) {
+    body {
+      @apply bg-white text-[#213547];
+    }
+  }
+}
+
+@layer components {
+  a {
+    @apply font-medium text-[#646cff] no-underline;
+  }
+
+  a:hover {
+    @apply text-[#535bf2];
+  }
+
+  button {
+    @apply rounded-lg border border-transparent bg-[#1a1a1a] px-[1.2em] py-[0.6em] text-base font-medium font-inherit cursor-pointer transition-[border-color] duration-[0.25s];
+  }
+
+  button:hover {
+    @apply border-[#646cff];
+  }
+
+  button:focus,
+  button:focus-visible {
+    @apply outline-[4px] outline-[-webkit-focus-ring-color];
+  }
+
+  @media (prefers-color-scheme: light) {
+    a:hover {
+      @apply text-[#747bff];
+    }
+
+    button {
+      @apply bg-[#f9f9f9];
+    }
+  }
+
+  h1 {
+    @apply text-[3.2em] leading-[1.1];
+  }
+}

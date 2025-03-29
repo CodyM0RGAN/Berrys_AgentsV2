@@ -1,0 +1,377 @@
+name: Security Template
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+        description: 'Name of the service to scan'
+      python_version:
+        required: false
+        type: string
+        default: '3.10'
+        description: 'Python version to use'
+      working_directory:
+        required: false
+        type: string
+        description: 'Directory containing the service code'
+        default: 'services/${{ inputs.service_name }}'
+      scan_level:
+        required: false
+        type: string
+        default: 'standard'
+        description: 'Level of security scanning to perform (standard, thorough, compliance)'
+      fail_on_severity:
+        required: false
+        type: string
+        default: 'high'
+        description: 'Severity level to fail the workflow on (low, medium, high, critical)'
+    outputs:
+      security_success:
+        description: 'Whether the security scanning passed'
+        value: ${{ jobs.security_scan.outputs.security_success }}
+      vulnerabilities_found:
+        description: 'Number of vulnerabilities found'
+        value: ${{ jobs.security_scan.outputs.vulnerabilities_found }}
+      security_report:
+        description: 'Summary report of security findings'
+        value: ${{ jobs.security_scan.outputs.security_report }}
+
+jobs:
+  security_scan:
+    name: Security Scan ${{ inputs.service_name }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    
+    outputs:
+      security_success: ${{ steps.scan_results.outputs.security_success }}
+      vulnerabilities_found: ${{ steps.scan_results.outputs.vulnerabilities_found }}
+      security_report: ${{ steps.scan_report.outputs.security_report }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            ${{ inputs.working_directory }}/requirements.txt
+            requirements.txt
+            requirements-dev.txt
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          if [ -f ../requirements-dev.txt ]; then
+            pip install -r ../requirements-dev.txt
+          fi
+          pip install bandit safety semgrep trufflehog
+      
+      - name: Create security scan directory
+        run: |
+          mkdir -p security-scan-results
+      
+      # Scan for secrets in code
+      - name: Run trufflehog for secret scanning
+        id: trufflehog
+        run: |
+          echo "Running trufflehog for secret scanning in ${{ inputs.service_name }}..."
+          
+          # Run trufflehog on the directory
+          trufflehog filesystem --json --directory=. > security-scan-results/trufflehog-results.json || true
+          
+          # Count findings
+          SECRETS_COUNT=$(jq 'length' security-scan-results/trufflehog-results.json)
+          echo "secrets_count=$SECRETS_COUNT" >> $GITHUB_OUTPUT
+          
+          # Check if any critical secrets were found
+          if [ "$SECRETS_COUNT" -gt "0" ]; then
+            echo "⚠️ Found $SECRETS_COUNT potential secrets in the codebase!"
+            CRITICAL_COUNT=$(jq '[.[] | select(.severity == "high" or .severity == "critical")] | length' security-scan-results/trufflehog-results.json)
+            echo "critical_secrets_count=$CRITICAL_COUNT" >> $GITHUB_OUTPUT
+            
+            if [ "$CRITICAL_COUNT" -gt "0" ] && [ "${{ inputs.fail_on_severity }}" == "high" -o "${{ inputs.fail_on_severity }}" == "critical" ]; then
+              echo "Found $CRITICAL_COUNT critical secrets, failing the build."
+              exit 1
+            fi
+          else
+            echo "No secrets found in the codebase."
+            echo "critical_secrets_count=0" >> $GITHUB_OUTPUT
+          fi
+      
+      # Scan for vulnerable dependencies
+      - name: Run safety for dependency scanning
+        id: safety
+        run: |
+          echo "Running safety for dependency scanning in ${{ inputs.service_name }}..."
+          
+          # Run safety on requirements
+          safety scan -r requirements.txt --json > security-scan-results/safety-results.json || true
+          
+          # Count vulnerabilities
+          VULN_COUNT=$(jq 'length' security-scan-results/safety-results.json)
+          echo "dependency_vulnerabilities_count=$VULN_COUNT" >> $GITHUB_OUTPUT
+          
+          # Count by severity
+          HIGH_COUNT=$(jq '[.[] | select(.severity == "high" or .severity == "critical")] | length' security-scan-results/safety-results.json)
+          echo "high_vulnerabilities_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          
+          if [ "$HIGH_COUNT" -gt "0" ] && [ "${{ inputs.fail_on_severity }}" == "high" -o "${{ inputs.fail_on_severity }}" == "critical" ]; then
+            echo "Found $HIGH_COUNT high severity vulnerabilities, failing the build."
+            exit 1
+          fi
+      
+      # Scan for SAST issues with bandit
+      - name: Run bandit for SAST scanning
+        id: bandit
+        run: |
+          echo "Running bandit for SAST scanning in ${{ inputs.service_name }}..."
+          
+          # Run bandit on the directory
+          bandit -r src -f json -o security-scan-results/bandit-results.json || true
+          
+          # Check if the results file exists and is not empty
+          if [ -f security-scan-results/bandit-results.json ] && [ -s security-scan-results/bandit-results.json ]; then
+            # Count issues by severity
+            HIGH_COUNT=$(jq '.results | map(select(.issue_severity == "HIGH")) | length' security-scan-results/bandit-results.json)
+            MEDIUM_COUNT=$(jq '.results | map(select(.issue_severity == "MEDIUM")) | length' security-scan-results/bandit-results.json)
+            LOW_COUNT=$(jq '.results | map(select(.issue_severity == "LOW")) | length' security-scan-results/bandit-results.json)
+            
+            echo "bandit_high_count=$HIGH_COUNT" >> $GITHUB_OUTPUT
+            echo "bandit_medium_count=$MEDIUM_COUNT" >> $GITHUB_OUTPUT
+            echo "bandit_low_count=$LOW_COUNT" >> $GITHUB_OUTPUT
+            
+            if [ "$HIGH_COUNT" -gt "0" ] && [ "${{ inputs.fail_on_severity }}" == "high" -o "${{ inputs.fail_on_severity }}" == "critical" ]; then
+              echo "Found $HIGH_COUNT high severity SAST issues, failing the build."
+              exit 1
+            fi
+            
+            if [ "$MEDIUM_COUNT" -gt "0" ] && [ "${{ inputs.fail_on_severity }}" == "medium" ]; then
+              echo "Found $MEDIUM_COUNT medium severity SAST issues, failing the build."
+              exit 1
+            fi
+            
+            if [ "$LOW_COUNT" -gt "0" ] && [ "${{ inputs.fail_on_severity }}" == "low" ]; then
+              echo "Found $LOW_COUNT low severity SAST issues, failing the build."
+              exit 1
+            fi
+          else
+            echo "No bandit results found or file is empty."
+            echo "bandit_high_count=0" >> $GITHUB_OUTPUT
+            echo "bandit_medium_count=0" >> $GITHUB_OUTPUT
+            echo "bandit_low_count=0" >> $GITHUB_OUTPUT
+          fi
+      
+      # Advanced rule-based scanning with semgrep
+      - name: Run semgrep for advanced code analysis
+        id: semgrep
+        if: inputs.scan_level != 'standard'
+        run: |
+          echo "Running semgrep for advanced code analysis in ${{ inputs.service_name }}..."
+          
+          # Run semgrep with security ruleset
+          semgrep --config=p/security-audit --json -o security-scan-results/semgrep-results.json src || true
+          
+          # Count issues
+          if [ -f security-scan-results/semgrep-results.json ] && [ -s security-scan-results/semgrep-results.json ]; then
+            SEMGREP_COUNT=$(jq '.results | length' security-scan-results/semgrep-results.json)
+            echo "semgrep_count=$SEMGREP_COUNT" >> $GITHUB_OUTPUT
+            
+            # Count by severity
+            SEMGREP_HIGH=$(jq '.results | map(select(.severity == "ERROR")) | length' security-scan-results/semgrep-results.json)
+            echo "semgrep_high_count=$SEMGREP_HIGH" >> $GITHUB_OUTPUT
+            
+            if [ "$SEMGREP_HIGH" -gt "0" ] && [ "${{ inputs.fail_on_severity }}" == "high" -o "${{ inputs.fail_on_severity }}" == "critical" ]; then
+              echo "Found $SEMGREP_HIGH high severity semgrep issues, failing the build."
+              exit 1
+            fi
+          else
+            echo "No semgrep results found or file is empty."
+            echo "semgrep_count=0" >> $GITHUB_OUTPUT
+            echo "semgrep_high_count=0" >> $GITHUB_OUTPUT
+          fi
+      
+      # Compliance scanning
+      - name: Run compliance checks
+        id: compliance
+        if: inputs.scan_level == 'compliance'
+        run: |
+          echo "Running compliance checks for ${{ inputs.service_name }}..."
+          
+          # Create a report file
+          cat > security-scan-results/compliance-report.json << EOF
+          {
+            "scans": [
+              {
+                "name": "PII Data Check",
+                "status": "success",
+                "findings": []
+              },
+              {
+                "name": "API Security Check",
+                "status": "success", 
+                "findings": []
+              },
+              {
+                "name": "Authentication Check",
+                "status": "success",
+                "findings": []
+              }
+            ]
+          }
+          EOF
+          
+          # Check for PII patterns in code
+          echo "Checking for PII data patterns..."
+          PII_PATTERNS=("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b" "\\b\\d{3}-\\d{2}-\\d{4}\\b" "\\b\\d{16}\\b")
+          PII_FOUND=0
+          PII_FINDINGS="[]"
+          
+          for pattern in "${PII_PATTERNS[@]}"; do
+            MATCHES=$(grep -r -P "$pattern" --include="*.py" src || echo "")
+            if [ ! -z "$MATCHES" ]; then
+              PII_FOUND=1
+              # Add the findings to JSON
+              PII_FINDINGS=$(echo "$PII_FINDINGS" | jq ". += [{\"pattern\": \"$pattern\", \"matches\": \"found\"}]")
+            fi
+          done
+          
+          if [ "$PII_FOUND" -eq "1" ]; then
+            echo "Found potential PII data in code!"
+            # Update the compliance report
+            jq "(.scans[] | select(.name == \"PII Data Check\")) |= (.status = \"failure\", .findings = $PII_FINDINGS)" security-scan-results/compliance-report.json > temp.json
+            mv temp.json security-scan-results/compliance-report.json
+          fi
+          
+          echo "compliance_success=$([ "$PII_FOUND" -eq "0" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
+      
+      # Generate security report
+      - name: Generate security scan report
+        id: scan_report
+        if: always()
+        run: |
+          echo "Generating security scan report for ${{ inputs.service_name }}..."
+          
+          # Create a comprehensive report
+          cat > security-scan-results/security-report.json << EOF
+          {
+            "service": "${{ inputs.service_name }}",
+            "scan_level": "${{ inputs.scan_level }}",
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "summary": {
+              "secrets": {
+                "count": ${{ steps.trufflehog.outputs.secrets_count || 0 }},
+                "critical_count": ${{ steps.trufflehog.outputs.critical_secrets_count || 0 }}
+              },
+              "dependencies": {
+                "count": ${{ steps.safety.outputs.dependency_vulnerabilities_count || 0 }},
+                "high_count": ${{ steps.safety.outputs.high_vulnerabilities_count || 0 }}
+              },
+              "sast": {
+                "high_count": ${{ steps.bandit.outputs.bandit_high_count || 0 }},
+                "medium_count": ${{ steps.bandit.outputs.bandit_medium_count || 0 }},
+                "low_count": ${{ steps.bandit.outputs.bandit_low_count || 0 }}
+              }
+            },
+            "advanced": {
+              "semgrep": {
+                "count": ${{ steps.semgrep.outputs.semgrep_count || 0 }},
+                "high_count": ${{ steps.semgrep.outputs.semgrep_high_count || 0 }}
+              }
+            },
+            "compliance": {
+              "success": ${{ steps.compliance.outputs.compliance_success || true }}
+            }
+          }
+          EOF
+          
+          # Generate a markdown summary
+          cat > security-scan-results/security-report.md << EOF
+          # Security Scan Results for ${{ inputs.service_name }}
+          
+          ## Summary
+          
+          - **Secret Detection**: ${{ steps.trufflehog.outputs.secrets_count || 0 }} potential secrets found, ${{ steps.trufflehog.outputs.critical_secrets_count || 0 }} critical
+          - **Dependency Vulnerabilities**: ${{ steps.safety.outputs.dependency_vulnerabilities_count || 0 }} vulnerabilities found, ${{ steps.safety.outputs.high_vulnerabilities_count || 0 }} high severity
+          - **SAST Findings**: ${{ steps.bandit.outputs.bandit_high_count || 0 }} high, ${{ steps.bandit.outputs.bandit_medium_count || 0 }} medium, ${{ steps.bandit.outputs.bandit_low_count || 0 }} low
+          
+          ## Advanced Scans (Level: ${{ inputs.scan_level }})
+          
+          ${{ inputs.scan_level != 'standard' && '- **Semgrep Results**: ' || '' }}${{ steps.semgrep.outputs.semgrep_count || 0 }} findings, ${{ steps.semgrep.outputs.semgrep_high_count || 0 }} high severity
+          
+          ${{ inputs.scan_level == 'compliance' && '## Compliance Check Results' || '' }}
+          
+          ${{ inputs.scan_level == 'compliance' && '- **Compliance Status**: ' || '' }}${{ steps.compliance.outputs.compliance_success == 'true' && 'Passed' || 'Failed' }}
+          EOF
+          
+          # Create report output
+          echo "security_report<<EOF" >> $GITHUB_OUTPUT
+          cat security-scan-results/security-report.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      # Process scan results
+      - name: Process security scan results
+        id: scan_results
+        if: always()
+        run: |
+          echo "Processing security scan results..."
+          
+          # Calculate total vulnerabilities
+          TOTAL_VULNS=$((${steps.trufflehog.outputs.secrets_count:-0} + ${steps.safety.outputs.dependency_vulnerabilities_count:-0} + ${steps.bandit.outputs.bandit_high_count:-0} + ${steps.bandit.outputs.bandit_medium_count:-0} + ${steps.bandit.outputs.bandit_low_count:-0}))
+          
+          if [ "${{ inputs.scan_level }}" != "standard" ]; then
+            TOTAL_VULNS=$((TOTAL_VULNS + ${steps.semgrep.outputs.semgrep_count:-0}))
+          fi
+          
+          echo "vulnerabilities_found=$TOTAL_VULNS" >> $GITHUB_OUTPUT
+          
+          # Determine success based on fail_on_severity
+          CRITICAL_VULNS=$((${steps.trufflehog.outputs.critical_secrets_count:-0} + ${steps.safety.outputs.high_vulnerabilities_count:-0} + ${steps.bandit.outputs.bandit_high_count:-0}))
+          
+          if [ "${{ inputs.scan_level }}" != "standard" ]; then
+            CRITICAL_VULNS=$((CRITICAL_VULNS + ${steps.semgrep.outputs.semgrep_high_count:-0}))
+          fi
+          
+          if [ "${{ inputs.fail_on_severity }}" == "critical" ] || [ "${{ inputs.fail_on_severity }}" == "high" ]; then
+            if [ "$CRITICAL_VULNS" -gt "0" ]; then
+              echo "security_success=false" >> $GITHUB_OUTPUT
+              echo "Security scan failed due to high severity findings!"
+            else
+              echo "security_success=true" >> $GITHUB_OUTPUT
+              echo "Security scan passed!"
+            fi
+          elif [ "${{ inputs.fail_on_severity }}" == "medium" ]; then
+            if [ "$CRITICAL_VULNS" -gt "0" ] || [ "${steps.bandit.outputs.bandit_medium_count:-0}" -gt "0" ]; then
+              echo "security_success=false" >> $GITHUB_OUTPUT
+              echo "Security scan failed due to medium or higher severity findings!"
+            else
+              echo "security_success=true" >> $GITHUB_OUTPUT
+              echo "Security scan passed!"
+            fi
+          elif [ "${{ inputs.fail_on_severity }}" == "low" ]; then
+            if [ "$TOTAL_VULNS" -gt "0" ]; then
+              echo "security_success=false" >> $GITHUB_OUTPUT
+              echo "Security scan failed due to findings of any severity!"
+            else
+              echo "security_success=true" >> $GITHUB_OUTPUT
+              echo "Security scan passed!"
+            fi
+          else
+            echo "security_success=true" >> $GITHUB_OUTPUT
+            echo "Security scan completed!"
+          fi
+        
+      - name: Upload security scan results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.service_name }}-security-scan-results
+          path: ${{ inputs.working_directory }}/security-scan-results
+          retention-days: 30

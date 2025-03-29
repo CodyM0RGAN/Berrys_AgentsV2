@@ -91,7 +91,7 @@ class AgentTemplateModel(StandardModel):
     """
     SQLAlchemy model for agent templates.
     """
-    __tablename__ = "agent_template"  # Changed to singular
+    __tablename__ = "agent_template_legacy"  # Renamed to avoid conflict with AgentTemplateEngineModel
     
     # Primary key (string ID for easier reference)
     id = Column(String(50), primary_key=True)

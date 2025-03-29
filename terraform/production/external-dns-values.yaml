@@ -1,0 +1,99 @@
+# External DNS configuration for production environment
+
+## Provider configuration
+provider: azure
+txtOwnerId: berrys-production
+domainFilters:
+  - berrys.ai
+  - api.berrys.ai
+  - dashboard.berrys.ai
+
+## Azure configuration
+azure:
+  resourceGroup: "berrys-dns"
+  tenantId: "${AZURE_TENANT_ID}"
+  subscriptionId: "${AZURE_SUBSCRIPTION_ID}"
+  useManagedIdentityExtension: true
+
+## Kubernetes source configuration
+sources:
+  - service
+  - ingress
+
+## Annotation filter
+annotationFilter: "kubernetes.io/ingress.class=external-dns"
+
+## Registry and txt prefix
+registry: "txt"
+txtPrefix: "berrys-"
+
+## Sync policy - create new records and sync
+policy: sync
+syncPolicy: sync
+createPolicy: sync
+
+## Interval between DNS updates
+interval: "1m"
+
+## Resource settings
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "200m"
+
+## Security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534
+  capabilities:
+    drop:
+      - ALL
+
+## Pod tolerations and node affinity
+tolerations: []
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: "kubernetes.io/os"
+          operator: In
+          values:
+          - linux
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - external-dns
+        topologyKey: kubernetes.io/hostname
+
+## Log level
+logLevel: info
+
+## Metrics and Prometheus integration
+metrics:
+  enabled: true
+  service:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "7979"
+
+## Pod labels and annotations
+podLabels:
+  app.kubernetes.io/part-of: "berrys-agents"
+  environment: "production"
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "7979"

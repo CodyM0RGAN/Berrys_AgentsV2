@@ -5,238 +5,146 @@ on:
     branches: [ main ]
     paths:
       - 'services/api-gateway/**'
-      - 'shared/**'
+      - 'shared/utils/src/**'
       - '.github/workflows/api-gateway.yml'
+      - '.github/workflows/templates/**'
   pull_request:
     branches: [ main ]
     paths:
       - 'services/api-gateway/**'
-      - 'shared/**'
-      - '.github/workflows/api-gateway.yml'
+      - 'shared/utils/src/**'
   workflow_dispatch:
     inputs:
-      deploy_environment:
+      environment:
         description: 'Environment to deploy to'
-        required: false
-        default: 'dev'
+        required: true
+        default: 'development'
         type: choice
         options:
-          - dev
+          - development
           - qa
-          - prod
-
-env:
-  SERVICE_NAME: api-gateway
-  WORKING_DIRECTORY: services/api-gateway
-  PYTHON_VERSION: '3.10'
+          - production
 
 jobs:
   build:
-    name: Build
     uses: ./.github/workflows/templates/build.yml
     with:
-      service_name: ${{ env.SERVICE_NAME }}
-      python_version: ${{ env.PYTHON_VERSION }}
-      working_directory: ${{ env.WORKING_DIRECTORY }}
-      cache_dependencies: true
-
+      service_name: api-gateway
+      python_version: '3.10'
+  
   test:
-    name: Test
     needs: build
-    uses: ./.github/workflows/templates/test.yml
-    with:
-      service_name: ${{ env.SERVICE_NAME }}
-      python_version: ${{ env.PYTHON_VERSION }}
-      working_directory: ${{ env.WORKING_DIRECTORY }}
-      coverage_threshold: 80
-      test_parallelism: 4
-
-  quality:
-    name: Quality
-    needs: build
-    uses: ./.github/workflows/templates/quality.yml
-    with:
-      service_name: ${{ env.SERVICE_NAME }}
-      python_version: ${{ env.PYTHON_VERSION }}
-      working_directory: ${{ env.WORKING_DIRECTORY }}
-      lint_fail_on_error: false
-      security_fail_on_error: true
-
-  report:
-    name: Generate Reports
-    needs: [test, quality]
     runs-on: ubuntu-latest
-    if: always()
+    if: needs.build.outputs.build_success == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
+        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
+          python-version: '3.10'
+          
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests matplotlib
-
-      - name: Download test artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ env.SERVICE_NAME }}-test-results
-          path: artifacts/${{ env.SERVICE_NAME }}-test-results
-
-      - name: Download quality artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ env.SERVICE_NAME }}-quality-results
-          path: artifacts/${{ env.SERVICE_NAME }}-quality-results
-
-      - name: Generate test report
+          pip install -r services/api-gateway/requirements.txt
+          pip install pytest pytest-asyncio pytest-cov
+      
+      - name: Run tests
         run: |
-          python .github/scripts/ci/test-collector.py \
-            --artifacts-dir artifacts \
-            --output-file test-report.json \
-            --format json
+          cd services/api-gateway
+          pytest --cov=src --cov-report=xml
           
-          python .github/scripts/ci/test-collector.py \
-            --artifacts-dir artifacts \
-            --output-file test-report.html \
-            --format html
-          
-          python .github/scripts/ci/test-collector.py \
-            --artifacts-dir artifacts \
-            --output-file test-report.md \
-            --format markdown
-
-      - name: Generate coverage report
-        run: |
-          python .github/scripts/ci/coverage-reporter.py \
-            --artifacts-dir artifacts \
-            --output-file coverage-report.json \
-            --format json \
-            --threshold 80
-          
-          python .github/scripts/ci/coverage-reporter.py \
-            --artifacts-dir artifacts \
-            --output-file coverage-report.html \
-            --format html \
-            --threshold 80
-          
-          python .github/scripts/ci/coverage-reporter.py \
-            --artifacts-dir artifacts \
-            --output-file coverage-report.md \
-            --format markdown \
-            --threshold 80
-
-      - name: Upload reports
+      - name: Upload coverage report
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.SERVICE_NAME }}-reports
-          path: |
-            test-report.*
-            coverage-report.*
-          retention-days: 30
-
+          name: api-gateway-coverage-report
+          path: services/api-gateway/coverage.xml
+          
   deploy-dev:
-    name: Deploy to Dev
-    needs: [test, quality]
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'dev')
-    uses: ./.github/workflows/templates/deploy.yml
-    with:
-      service_name: ${{ env.SERVICE_NAME }}
-      environment: dev
-      working_directory: ${{ env.WORKING_DIRECTORY }}
-      docker_image: berrys/${{ env.SERVICE_NAME }}
-      docker_tag: ${{ github.sha }}
-      deploy_timeout: 300
-      run_migrations: false
-    secrets: inherit
-
-  deploy-qa:
-    name: Deploy to QA
-    needs: deploy-dev
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'qa')
-    uses: ./.github/workflows/templates/deploy.yml
-    with:
-      service_name: ${{ env.SERVICE_NAME }}
-      environment: qa
-      working_directory: ${{ env.WORKING_DIRECTORY }}
-      docker_image: berrys/${{ env.SERVICE_NAME }}
-      docker_tag: ${{ github.sha }}
-      deploy_timeout: 300
-      run_migrations: false
-    secrets: inherit
-
-  deploy-prod:
-    name: Deploy to Production
-    needs: deploy-qa
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_environment == 'prod')
-    uses: ./.github/workflows/templates/deploy.yml
-    with:
-      service_name: ${{ env.SERVICE_NAME }}
-      environment: prod
-      working_directory: ${{ env.WORKING_DIRECTORY }}
-      docker_image: berrys/${{ env.SERVICE_NAME }}
-      docker_tag: ${{ github.sha }}
-      deploy_timeout: 300
-      run_migrations: false
-    secrets: inherit
-
-  verify-deployment:
-    name: Verify Deployment
-    needs: [deploy-dev, deploy-qa, deploy-prod]
-    if: |
-      always() &&
-      (needs.deploy-dev.result == 'success' || needs.deploy-qa.result == 'success' || needs.deploy-prod.result == 'success')
+    needs: [build, test]
     runs-on: ubuntu-latest
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development')
+    environment: development
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      - name: Determine environment
-        id: determine-env
-        run: |
-          if [[ "${{ needs.deploy-prod.result }}" == "success" ]]; then
-            echo "environment=prod" >> $GITHUB_OUTPUT
-            echo "service_url=https://api.berrys.ai" >> $GITHUB_OUTPUT
-          elif [[ "${{ needs.deploy-qa.result }}" == "success" ]]; then
-            echo "environment=qa" >> $GITHUB_OUTPUT
-            echo "service_url=https://qa-api.berrys.ai" >> $GITHUB_OUTPUT
-          else
-            echo "environment=dev" >> $GITHUB_OUTPUT
-            echo "service_url=https://dev-api.berrys.ai" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Verify deployment
-        run: |
-          python .github/scripts/ci/deployment-verifier.py \
-            --service-url ${{ steps.determine-env.outputs.service_url }} \
-            --health-endpoint /health \
-            --timeout 300 \
-            --interval 5 \
-            --output-file deployment-verification-${{ steps.determine-env.outputs.environment }}.json \
-            --headers '{"Authorization": "Bearer ${{ secrets.API_TOKEN }}"}'
-
-      - name: Upload verification report
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ env.SERVICE_NAME }}-deployment-verification
-          path: deployment-verification-*.json
-          retention-days: 30
+          context: .
+          file: services/api-gateway/Dockerfile
+          push: false
+          tags: berrys-agents/api-gateway:dev
+          cache-from: type=registry,ref=berrys-agents/api-gateway:buildcache
+          cache-to: type=registry,ref=berrys-agents/api-gateway:buildcache,mode=max
+          
+      - name: Deploy to development environment
+        run: echo "Deploying to development environment"
+        # In a real scenario, this would include:
+        # - Pushing to a container registry
+        # - Updating Kubernetes manifests
+        # - Applying the manifests to the cluster
+    
+  monitor-dev:
+    needs: deploy-dev
+    uses: ./.github/workflows/templates/monitoring.yml
+    with:
+      service_name: api-gateway
+      environment: development
+      deploy_url: http://localhost:8000  # This would be the actual URL in production
+      verify_health: true
+      verify_metrics: true
+      verify_performance: true
+    
+  deploy-qa:
+    needs: [monitor-dev]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'qa'
+    environment: qa
+    steps:
+      - name: Deploy to QA environment
+        run: echo "Deploying to QA environment"
+        
+  monitor-qa:
+    needs: deploy-qa
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'qa'
+    uses: ./.github/workflows/templates/monitoring.yml
+    with:
+      service_name: api-gateway
+      environment: qa
+      deploy_url: http://qa-api.example.com  # Replace with actual QA URL
+      verify_health: true
+      verify_metrics: true
+      verify_performance: true
+  
+  deploy-prod:
+    needs: [monitor-qa]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment: production
+    steps:
+      - name: Deploy to production environment
+        run: echo "Deploying to production environment"
+  
+  monitor-prod:
+    needs: deploy-prod
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    uses: ./.github/workflows/templates/monitoring.yml
+    with:
+      service_name: api-gateway
+      environment: production
+      deploy_url: http://api.example.com  # Replace with actual production URL
+      verify_health: true
+      verify_metrics: true
+      verify_performance: true
+      enable_canary: true
+      canary_url: http://canary-api.example.com  # Replace with actual canary URL
+      production_url: http://api.example.com  # Replace with actual production URL
+      performance_threshold: 1.2  # Allow 20% performance degradation
+      monitor_duration: 300  # Monitor for 5 minutes

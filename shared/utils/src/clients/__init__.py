@@ -4,6 +4,8 @@ Service client implementations for interacting with various services.
 This package contains client implementations for interacting with the different
 services in the Berrys_AgentsV2 system. These clients include retry mechanisms
 with exponential backoff to handle transient failures.
+
+The synchronous wrappers provide compatibility with synchronous frameworks like Flask.
 """
 
 from shared.utils.src.clients.base import BaseAPIClient, APIError
@@ -13,6 +15,14 @@ from shared.utils.src.clients.planning_system import PlanningSystemClient
 from shared.utils.src.clients.project_coordinator import ProjectCoordinatorClient
 from shared.utils.src.clients.service_integration import ServiceIntegrationClient
 from shared.utils.src.clients.tool_integration import ToolIntegrationClient
+from shared.utils.src.clients.sync_adapter import (
+    SyncAgentOrchestratorClient,
+    SyncModelOrchestrationClient,
+    SyncPlanningSystemClient,
+    SyncProjectCoordinatorClient,
+    SyncServiceIntegrationClient,
+    SyncToolIntegrationClient
+)
 
 __all__ = [
     'BaseAPIClient',
@@ -23,4 +33,10 @@ __all__ = [
     'ProjectCoordinatorClient',
     'ServiceIntegrationClient',
     'ToolIntegrationClient',
+    'SyncAgentOrchestratorClient',
+    'SyncModelOrchestrationClient',
+    'SyncPlanningSystemClient',
+    'SyncProjectCoordinatorClient',
+    'SyncServiceIntegrationClient',
+    'SyncToolIntegrationClient',
 ]

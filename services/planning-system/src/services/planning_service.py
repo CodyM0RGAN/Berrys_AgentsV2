@@ -45,6 +45,7 @@ from .forecaster import ProjectForecaster
 from .resource_optimizer import ResourceOptimizer
 from .resource_service import ResourceService
 from .dependency_manager import DependencyManager
+from .base_service import BaseService
 
 logger = logging.getLogger(__name__)
 

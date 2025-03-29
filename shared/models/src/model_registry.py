@@ -24,23 +24,23 @@ SERVICE_MODULES = {
         'pydantic': 'shared.models.src'
     },
     'project_coordinator': {
-        'sqlalchemy': 'src.models.internal',  # Changed to use relative path within the service
+        'sqlalchemy': 'services.project_coordinator.src.models.internal',  # Use absolute import path
         'pydantic': 'shared.models.src'
     },
     'agent_orchestrator': {
-        'sqlalchemy': 'src.models.internal',  # Changed to use relative path within the service
+        'sqlalchemy': 'services.agent_orchestrator.src.models.internal',  # Use absolute import path
         'pydantic': 'shared.models.src'
     },
     'model_orchestration': {
-        'sqlalchemy': 'src.models.internal',  # Changed to use relative path within the service
+        'sqlalchemy': 'services.model_orchestration.src.models.internal',  # Use absolute import path
         'pydantic': 'shared.models.src'
     },
     'planning_system': {
-        'sqlalchemy': 'src.models.internal',  # Changed to use relative path within the service
+        'sqlalchemy': 'services.planning_system.src.models.internal',  # Use absolute import path
         'pydantic': 'shared.models.src'
     },
     'tool_integration': {
-        'sqlalchemy': 'src.models.internal',  # Changed to use relative path within the service
+        'sqlalchemy': 'services.tool_integration.src.models.internal',  # Use absolute import path
         'pydantic': 'shared.models.src'
     }
 }

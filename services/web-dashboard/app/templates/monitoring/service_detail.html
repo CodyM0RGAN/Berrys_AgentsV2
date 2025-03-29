@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+
+{% block title %}{{ service_name }} Monitoring{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <h1 class="h3 mb-2 text-gray-800">{{ service_name }} Details</h1>
+            <p class="mb-4">Detailed monitoring information for the {{ service_name }} service.</p>
+            <a href="{{ url_for('monitoring.index') }}" class="btn btn-secondary mb-3">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Status</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">Healthy</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Uptime</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">5d 14h 23m</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Response Time (avg)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">87 ms</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-tachometer-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Active Alerts</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">1</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resource Usage Charts Row -->
+    <div class="row">
+        <!-- CPU Usage Chart -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">CPU Usage</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Time Range:</div>
+                            <a class="dropdown-item time-range" data-range="hour" href="#">Last Hour</a>
+                            <a class="dropdown-item time-range" data-range="day" href="#">Last Day</a>
+                            <a class="dropdown-item time-range" data-range="week" href="#">Last Week</a>
+                            <a class="dropdown-item time-range" data-range="month" href="#">Last Month</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="cpuUsageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Memory Usage Chart -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Memory Usage</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Time Range:</div>
+                            <a class="dropdown-item time-range" data-range="hour" href="#">Last Hour</a>
+                            <a class="dropdown-item time-range" data-range="day" href="#">Last Day</a>
+                            <a class="dropdown-item time-range" data-range="week" href="#">Last Week</a>
+                            <a class="dropdown-item time-range" data-range="month" href="#">Last Month</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="memoryUsageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Request Charts Row -->
+    <div class="row">
+        <!-- Request Rate Chart -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Request Rate</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Time Range:</div>
+                            <a class="dropdown-item time-range" data-range="hour" href="#">Last Hour</a>
+                            <a class="dropdown-item time-range" data-range="day" href="#">Last Day</a>
+                            <a class="dropdown-item time-range" data-range="week" href="#">Last Week</a>
+                            <a class="dropdown-item time-range" data-range="month" href="#">Last Month</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="requestRateChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Response Time Chart -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Response Time</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Time Range:</div>
+                            <a class="dropdown-item time-range" data-range="hour" href="#">Last Hour</a>
+                            <a class="dropdown-item time-range" data-range="day" href="#">Last Day</a>
+                            <a class="dropdown-item time-range" data-range="week" href="#">Last Week</a>
+                            <a class="dropdown-item time-range" data-range="month" href="#">Last Month</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="responseTimeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Logs -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Logs</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Log Level:</div>
+                            <a class="dropdown-item log-level" data-level="all" href="#">All</a>
+                            <a class="dropdown-item log-level" data-level="info" href="#">Info</a>
+                            <a class="dropdown-item log-level" data-level="warning" href="#">Warning</a>
+                            <a class="dropdown-item log-level" data-level="error" href="#">Error</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="logs-container"
+                        style="height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.875rem;">
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:38:23]</span> <span
+                                class="text-success">[INFO]</span> Service started successfully with 8 workers
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:38:24]</span> <span
+                                class="text-success">[INFO]</span> Connected to database successfully
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:40:15]</span> <span
+                                class="text-success">[INFO]</span> Processed request: GET /api/v1/projects in 87ms
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:42:56]</span> <span
+                                class="text-success">[INFO]</span> Processed request: POST /api/v1/users/login in 45ms
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:43:12]</span> <span
+                                class="text-warning">[WARNING]</span> High memory usage detected: 75% - consider scaling
+                            up
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:45:34]</span> <span
+                                class="text-success">[INFO]</span> Processed request: GET /api/v1/tools in 92ms
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:48:02]</span> <span
+                                class="text-danger">[ERROR]</span> Failed to process request: Database connection
+                            timeout
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:48:03]</span> <span
+                                class="text-success">[INFO]</span> Reconnecting to database...
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:48:05]</span> <span
+                                class="text-success">[INFO]</span> Database connection reestablished successfully
+                        </div>
+                        <div class="log-entry bg-light p-2 mb-1">
+                            <span class="text-info">[2025-03-28 15:50:12]</span> <span
+                                class="text-success">[INFO]</span> Processed request: GET /api/v1/projects/123 in 78ms
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Health Checks -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Health Checks</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Component</th>
+                                    <th>Status</th>
+                                    <th>Last Check</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>API</td>
+                                    <td><span class="badge badge-success">Healthy</span></td>
+                                    <td>2025-03-28 15:52:34</td>
+                                    <td>All endpoints responding normally</td>
+                                </tr>
+                                <tr>
+                                    <td>Database</td>
+                                    <td><span class="badge badge-success">Healthy</span></td>
+                                    <td>2025-03-28 15:52:34</td>
+                                    <td>Connection pool: 5/10 active</td>
+                                </tr>
+                                <tr>
+                                    <td>Message Queue</td>
+                                    <td><span class="badge badge-success">Healthy</span></td>
+                                    <td>2025-03-28 15:52:34</td>
+                                    <td>Queue depth: 3 messages</td>
+                                </tr>
+                                <tr>
+                                    <td>External API</td>
+                                    <td><span class="badge badge-warning">Degraded</span></td>
+                                    <td>2025-03-28 15:52:34</td>
+                                    <td>High latency: 450ms (threshold: 200ms)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Generate random data for the charts
+    function generateTimeLabels(count) {
+        const now = new Date();
+        const labels = [];
+        for (let i = count - 1; i >= 0; i--) {
+            const date = new Date(now.getTime() - i * 5 * 60000); // 5 minute intervals
+            labels.push(date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+        return labels;
+    }
+
+    function generateRandomData(count, min, max) {
+        return Array.from({ length: count }, () => Math.floor(Math.random() * (max - min + 1)) + min);
+    }
+
+    const timeLabels = generateTimeLabels(24);
+
+    // CPU Usage Chart
+    const cpuCtx = document.getElementById('cpuUsageChart');
+    const cpuData = generateRandomData(24, 20, 60);
+    new Chart(cpuCtx, {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: [{
+                label: 'CPU Usage (%)',
+                data: cpuData,
+                backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                borderColor: 'rgba(78, 115, 223, 1)',
+                pointRadius: 3,
+                pointBackgroundColor: 'rgba(78, 115, 223, 1)',
+                pointBorderColor: 'rgba(78, 115, 223, 1)',
+                pointHoverRadius: 3,
+                pointHoverBackgroundColor: 'rgba(78, 115, 223, 1)',
+                pointHoverBorderColor: 'rgba(78, 115, 223, 1)',
+                pointHitRadius: 10,
+                pointBorderWidth: 2,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function (value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Memory Usage Chart
+    const memoryCtx = document.getElementById('memoryUsageChart');
+    const memoryData = generateRandomData(24, 30, 70);
+    new Chart(memoryCtx, {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: [{
+                label: 'Memory Usage (%)',
+                data: memoryData,
+                backgroundColor: 'rgba(28, 200, 138, 0.05)',
+                borderColor: 'rgba(28, 200, 138, 1)',
+                pointRadius: 3,
+                pointBackgroundColor: 'rgba(28, 200, 138, 1)',
+                pointBorderColor: 'rgba(28, 200, 138, 1)',
+                pointHoverRadius: 3,
+                pointHoverBackgroundColor: 'rgba(28, 200, 138, 1)',
+                pointHoverBorderColor: 'rgba(28, 200, 138, 1)',
+                pointHitRadius: 10,
+                pointBorderWidth: 2,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        callback: function (value) {
+                            return value + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Request Rate Chart
+    const requestCtx = document.getElementById('requestRateChart');
+    const requestData = generateRandomData(24, 50, 150);
+    new Chart(requestCtx, {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: [{
+                label: 'Requests per Minute',
+                data: requestData,
+                backgroundColor: 'rgba(54, 185, 204, 0.05)',
+                borderColor: 'rgba(54, 185, 204, 1)',
+                pointRadius: 3,
+                pointBackgroundColor: 'rgba(54, 185, 204, 1)',
+                pointBorderColor: 'rgba(54, 185, 204, 1)',
+                pointHoverRadius: 3,
+                pointHoverBackgroundColor: 'rgba(54, 185, 204, 1)',
+                pointHoverBorderColor: 'rgba(54, 185, 204, 1)',
+                pointHitRadius: 10,
+                pointBorderWidth: 2,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // Response Time Chart
+    const responseCtx = document.getElementById('responseTimeChart');
+    const responseData = generateRandomData(24, 50, 120);
+    new Chart(responseCtx, {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: [{
+                label: 'Response Time (ms)',
+                data: responseData,
+                backgroundColor: 'rgba(246, 194, 62, 0.05)',
+                borderColor: 'rgba(246, 194, 62, 1)',
+                pointRadius: 3,
+                pointBackgroundColor: 'rgba(246, 194, 62, 1)',
+                pointBorderColor: 'rgba(246, 194, 62, 1)',
+                pointHoverRadius: 3,
+                pointHoverBackgroundColor: 'rgba(246, 194, 62, 1)',
+                pointHoverBorderColor: 'rgba(246, 194, 62, 1)',
+                pointHitRadius: 10,
+                pointBorderWidth: 2,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    ticks: {
+                        callback: function (value) {
+                            return value + ' ms';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Log filtering
+    document.querySelectorAll('.log-level').forEach(element => {
+        element.addEventListener('click', function (e) {
+            e.preventDefault();
+            const level = this.getAttribute('data-level');
+            console.log('Filtering logs by level:', level);
+            // In a real implementation, this would filter the logs
+        });
+    });
+</script>
+{% endblock %}

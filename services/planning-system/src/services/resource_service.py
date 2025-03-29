@@ -11,7 +11,7 @@ from uuid import UUID
 from datetime import datetime
 
 from .repository import PlanningRepository
-from .base import BaseService
+from .base_service import BaseService
 from ..models.api.resource import (
     ResourceCreate,
     ResourceUpdate,

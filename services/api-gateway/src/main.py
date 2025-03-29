@@ -7,9 +7,14 @@ from datetime import datetime, timedelta
 import uvicorn
 
 # Import shared modules
-from shared.utils.src.logging import setup_logging, get_logger
 from shared.utils.src.auth import create_access_token, get_current_user, get_password_hash, verify_password
 from shared.utils.src.messaging import init_messaging, close_messaging, get_event_bus, get_command_bus
+
+# Import monitoring modules
+from shared.utils.src.monitoring.middleware.fastapi import setup_monitoring
+from shared.utils.src.monitoring.logging import get_logger, configure_logging
+from shared.utils.src.monitoring.metrics import configure_metrics, MetricsBackend
+from shared.utils.src.monitoring.health import register_health_check, check_health
 
 # Import local modules
 from .database import get_db, check_db_connection, init_db
@@ -19,8 +24,23 @@ from .routers import projects
 # TODO: Uncomment these imports when the routers are implemented
 # from .routers import agents, tasks, tools, users, models, audit
 
-# Setup logging
-setup_logging(service_name="api-gateway")
+# Setup monitoring
+configure_logging(
+    level="INFO",
+    json_format=True,
+    log_to_console=True,
+    service_name="api-gateway",
+)
+
+# Configure metrics
+configure_metrics(
+    backend=MetricsBackend.PROMETHEUS,
+    prefix="berrys_agents",
+    default_labels={"service": "api-gateway"},
+    http_port=8001,  # Use a different port to avoid conflict with the API server
+)
+
+# Create logger
 logger = get_logger(__name__)
 
 # Create FastAPI app
@@ -29,6 +49,9 @@ app = FastAPI(
     description="API Gateway for Project-based Multi-Agent System Framework",
     version="1.0.0",
 )
+
+# Set up monitoring middleware
+setup_monitoring(app, service_name="api-gateway")
 
 # CORS configuration
 app.add_middleware(
@@ -92,28 +115,29 @@ async def shutdown():
         logger.error(f"Error closing messaging: {str(e)}")
 
 
+# Register health checks
+@register_health_check("database")
+async def check_database():
+    """Check if database is accessible."""
+    is_healthy = await check_db_connection()
+    return is_healthy, "Database connection is healthy" if is_healthy else "Database connection failed"
+
+@register_health_check("messaging")
+def check_messaging():
+    """Check if messaging system is accessible."""
+    is_healthy = get_event_bus() is not None and get_command_bus() is not None
+    return is_healthy, "Messaging system is healthy" if is_healthy else "Messaging system is not available"
+
 @app.get("/api/health")
-async def health_check():
+def api_health_check():
     """
-    Health check endpoint.
+    Health check endpoint (API path version).
+    Returns a simple health check response.
     """
-    # Check database connection
-    db_healthy = await check_db_connection()
-    
-    # Check messaging connection
-    messaging_healthy = get_event_bus() is not None and get_command_bus() is not None
-    
-    # Overall health status
-    healthy = db_healthy and messaging_healthy
-    
+    # Create a simple health check response
     return {
-        "status": "healthy" if healthy else "unhealthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0",
-        "components": {
-            "database": "healthy" if db_healthy else "unhealthy",
-            "messaging": "healthy" if messaging_healthy else "unhealthy",
-        },
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
 

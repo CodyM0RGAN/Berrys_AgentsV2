@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+
+{% block title %}System Monitoring{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12">
+            <h1 class="h3 mb-2 text-gray-800">System Monitoring Dashboard</h1>
+            <p class="mb-4">Comprehensive monitoring and observability for all Berrys_AgentsV2 services.</p>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Services</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ service_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-server fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Healthy Services
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ healthy_service_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Active Alerts</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_alert_count }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">API Requests (24h)</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ request_count_24h }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exchange-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Health Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Service Health</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="serviceHealthTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th>Status</th>
+                                    <th>Uptime</th>
+                                    <th>CPU Usage</th>
+                                    <th>Memory Usage</th>
+                                    <th>Last Response Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for service in services %}
+                                <tr>
+                                    <td>{{ service.name }}</td>
+                                    <td>
+                                        {% if service.status == 'healthy' %}
+                                        <span class="badge badge-success">Healthy</span>
+                                        {% elif service.status == 'degraded' %}
+                                        <span class="badge badge-warning">Degraded</span>
+                                        {% else %}
+                                        <span class="badge badge-danger">Unhealthy</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ service.uptime }}</td>
+                                    <td>
+                                        <div class="progress mb-4">
+                                            <div class="progress-bar 
+                        {% if service.cpu_usage < 50 %}bg-success
+                        {% elif service.cpu_usage < 80 %}bg-warning
+                        {% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ service.cpu_usage }}%"
+                                                aria-valuenow="{{ service.cpu_usage }}" aria-valuemin="0"
+                                                aria-valuemax="100">
+                                                {{ service.cpu_usage }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="progress mb-4">
+                                            <div class="progress-bar 
+                        {% if service.memory_usage < 50 %}bg-success
+                        {% elif service.memory_usage < 80 %}bg-warning
+                        {% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ service.memory_usage }}%"
+                                                aria-valuenow="{{ service.memory_usage }}" aria-valuemin="0"
+                                                aria-valuemax="100">
+                                                {{ service.memory_usage }}%
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ service.last_response_time }} ms</td>
+                                    <td>
+                                        <a href="{{ url_for('monitoring.service_detail', service_name=service.name) }}"
+                                            class="btn btn-primary btn-sm">
+                                            <i class="fas fa-chart-line"></i> Details
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metrics Charts Row -->
+    <div class="row">
+        <!-- Area Chart -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Request Rate</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Time Range:</div>
+                            <a class="dropdown-item time-range" data-range="hour" href="#">Last Hour</a>
+                            <a class="dropdown-item time-range" data-range="day" href="#">Last Day</a>
+                            <a class="dropdown-item time-range" data-range="week" href="#">Last Week</a>
+                            <a class="dropdown-item time-range" data-range="month" href="#">Last Month</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="requestRateChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pie Chart -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Request Distribution</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Group By:</div>
+                            <a class="dropdown-item group-by" data-group="service" href="#">Service</a>
+                            <a class="dropdown-item group-by" data-group="endpoint" href="#">Endpoint</a>
+                            <a class="dropdown-item group-by" data-group="status" href="#">Status Code</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-pie pt-4 pb-2">
+                        <canvas id="requestDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Response Time Charts Row -->
+    <div class="row">
+        <!-- Area Chart -->
+        <div class="col-xl-12 col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Response Time</h6>
+                    <div class="dropdown no-arrow">
+                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in"
+                            aria-labelledby="dropdownMenuLink">
+                            <div class="dropdown-header">Service:</div>
+                            <a class="dropdown-item service-filter" data-service="all" href="#">All Services</a>
+                            {% for service in services %}
+                            <a class="dropdown-item service-filter" data-service="{{ service.name }}" href="#">{{
+                                service.name }}</a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="responseTimeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Alerts -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Active Alerts</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="alertsTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th>Alert</th>
+                                    <th>Severity</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for alert in alerts %}
+                                <tr>
+                                    <td>{{ alert.service }}</td>
+                                    <td>{{ alert.title }}</td>
+                                    <td>
+                                        {% if alert.severity == 'critical' %}
+                                        <span class="badge badge-danger">Critical</span>
+                                        {% elif alert.severity == 'error' %}
+                                        <span class="badge badge-danger">Error</span>
+                                        {% elif alert.severity == 'warning' %}
+                                        <span class="badge badge-warning">Warning</span>
+                                        {% else %}
+                                        <span class="badge badge-info">Info</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ alert.time }}</td>
+                                    <td>
+                                        {% if alert.status == 'active' %}
+                                        <span class="badge badge-danger">Active</span>
+                                        {% elif alert.status == 'acknowledged' %}
+                                        <span class="badge badge-warning">Acknowledged</span>
+                                        {% else %}
+                                        <span class="badge badge-success">Resolved</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('monitoring.alert_detail', alert_id=alert.id) }}"
+                                                class="btn btn-primary btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if alert.status == 'active' %}
+                                            <a href="{{ url_for('monitoring.acknowledge_alert', alert_id=alert.id) }}"
+                                                class="btn btn-warning btn-sm">
+                                                <i class="fas fa-check"></i>
+                                            </a>
+                                            {% endif %}
+                                            {% if alert.status != 'resolved' %}
+                                            <a href="{{ url_for('monitoring.resolve_alert', alert_id=alert.id) }}"
+                                                class="btn btn-success btn-sm">
+                                                <i class="fas fa-check-double"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Request Rate Chart
+    var ctx = document.getElementById("requestRateChart");
+    var requestRateChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ request_rate_labels | tojson }},
+    datasets: [{
+        label: "Requests",
+        lineTension: 0.3,
+        backgroundColor: "rgba(78, 115, 223, 0.05)",
+        borderColor: "rgba(78, 115, 223, 1)",
+        pointRadius: 3,
+        pointBackgroundColor: "rgba(78, 115, 223, 1)",
+        pointBorderColor: "rgba(78, 115, 223, 1)",
+        pointHoverRadius: 3,
+        pointHoverBackgroundColor: "rgba(78, 115, 223, 1)",
+        pointHoverBorderColor: "rgba(78, 115, 223, 1)",
+        pointHitRadius: 10,
+        pointBorderWidth: 2,
+        data: {{ request_rate_data | tojson }},
+      }],
+    },
+    options: {
+        responsive: true,
+            maintainAspectRatio: false,
+                layout: {
+            padding: {
+                left: 10,
+                    right: 25,
+                        top: 25,
+                            bottom: 0
+            }
+        },
+        scales: {
+            x: {
+                time: {
+                    unit: 'date'
+                },
+                grid: {
+                    display: false,
+                        drawBorder: false
+                },
+                ticks: {
+                    maxTicksLimit: 7
+                }
+            },
+            y: {
+                ticks: {
+                    maxTicksLimit: 5,
+                        padding: 10,
+          },
+                grid: {
+                    color: "rgb(234, 236, 244)",
+                        zeroLineColor: "rgb(234, 236, 244)",
+                            drawBorder: false,
+                                borderDash: [2],
+                                    zeroLineBorderDash: [2]
+                }
+            },
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: "rgb(255,255,255)",
+                    bodyFontColor: "#858796",
+                        titleMarginBottom: 10,
+                            titleFontColor: '#6e707e',
+                                titleFontSize: 14,
+                                    borderColor: '#dddfeb',
+                                        borderWidth: 1,
+                                            xPadding: 15,
+                                                yPadding: 15,
+                                                    displayColors: false,
+                                                        intersect: false,
+                                                            mode: 'index',
+                                                                caretPadding: 10,
+        }
+        }
+    }
+  });
+
+    // Request Distribution Chart
+    var ctx2 = document.getElementById("requestDistributionChart");
+    var requestDistributionChart = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: {{ request_distribution_labels | tojson }},
+    datasets: [{
+        data: {{ request_distribution_data | tojson }},
+        backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796'],
+        hoverBackgroundColor: ['#2e59d9', '#17a673', '#2c9faf', '#dda20a', '#be2617', '#60616f'],
+        hoverBorderColor: "rgba(234, 236, 244, 1)",
+      }],
+    },
+    options: {
+        responsive: true,
+            maintainAspectRatio: false,
+                plugins: {
+            legend: {
+                display: true,
+                    position: 'bottom'
+            },
+            tooltip: {
+                backgroundColor: "rgb(255,255,255)",
+                    bodyFontColor: "#858796",
+                        borderColor: '#dddfeb',
+                            borderWidth: 1,
+                                xPadding: 15,
+                                    yPadding: 15,
+                                        displayColors: false,
+                                            caretPadding: 10,
+        },
+        },
+        cutout: '75%',
+    },
+  });
+
+    // Response Time Chart
+    var ctx3 = document.getElementById("responseTimeChart");
+    var responseTimeChart = new Chart(ctx3, {
+        type: 'line',
+        data: {
+            labels: {{ response_time_labels | tojson }},
+    datasets: [
+        {% for service in response_time_datasets %}
+    {
+        label: "{{ service.name }}",
+            lineTension: 0.3,
+                backgroundColor: "rgba({{ service.color }}, 0.05)",
+                    borderColor: "rgba({{ service.color }}, 1)",
+                        pointRadius: 3,
+                            pointBackgroundColor: "rgba({{ service.color }}, 1)",
+                                pointBorderColor: "rgba({{ service.color }}, 1)",
+                                    pointHoverRadius: 3,
+                                        pointHoverBackgroundColor: "rgba({{ service.color }}, 1)",
+                                            pointHoverBorderColor: "rgba({{ service.color }}, 1)",
+                                                pointHitRadius: 10,
+                                                    pointBorderWidth: 2,
+                                                        data: { { service.data | tojson } },
+    },
+    {% endfor %}
+      ],
+    },
+    options: {
+        responsive: true,
+            maintainAspectRatio: false,
+                layout: {
+            padding: {
+                left: 10,
+                    right: 25,
+                        top: 25,
+                            bottom: 0
+            }
+        },
+        scales: {
+            x: {
+                time: {
+                    unit: 'date'
+                },
+                grid: {
+                    display: false,
+                        drawBorder: false
+                },
+                ticks: {
+                    maxTicksLimit: 7
+                }
+            },
+            y: {
+                ticks: {
+                    maxTicksLimit: 5,
+                        padding: 10,
+                            callback: function(value, index, values) {
+                                return value + ' ms';
+                            }
+                },
+                grid: {
+                    color: "rgb(234, 236, 244)",
+                        zeroLineColor: "rgb(234, 236, 244)",
+                            drawBorder: false,
+                                borderDash: [2],
+                                    zeroLineBorderDash: [2]
+                }
+            },
+        },
+        plugins: {
+            legend: {
+                display: true
+            },
+            tooltip: {
+                backgroundColor: "rgb(255,255,255)",
+                    bodyFontColor: "#858796",
+                        titleMarginBottom: 10,
+                            titleFontColor: '#6e707e',
+                                titleFontSize: 14,
+                                    borderColor: '#dddfeb',
+                                        borderWidth: 1,
+                                            xPadding: 15,
+                                                yPadding: 15,
+                                                    displayColors: false,
+                                                        intersect: false,
+                                                            mode: 'index',
+                                                                caretPadding: 10,
+                                                                    callbacks: {
+                    label: function(context) {
+                        var label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
+                        }
+                        label += context.parsed.y + ' ms';
+                        return label;
+                    }
+                }
+            }
+        }
+    }
+  });
+
+    // Time Range Change Handler
+    document.querySelectorAll('.time-range').forEach(function (element) {
+        element.addEventListener('click', function (e) {
+            e.preventDefault();
+            var range = this.getAttribute('data-range');
+            // Here you would make an AJAX call to get new data based on the time range
+            console.log('Changing time range to: ' + range);
+        });
+    });
+
+    // Group By Change Handler
+    document.querySelectorAll('.group-by').forEach(function (element) {
+        element.addEventListener('click', function (e) {
+            e.preventDefault();
+            var groupBy = this.getAttribute('data-group');
+            // Here you would make an AJAX call to get new data based on the grouping
+            console.log('Changing grouping to: ' + groupBy);
+        });
+    });
+
+    // Service Filter Change Handler
+    document.querySelectorAll('.service-filter').forEach(function (element) {
+        element.addEventListener('click', function (e) {
+            e.preventDefault();
+            var service = this.getAttribute('data-service');
+            // Here you would update the chart to only show the selected service
+            console.log('Filtering by service: ' + service);
+        });
+    });
+
+    // DataTables initialization
+    $(document).ready(function () {
+        $('#serviceHealthTable').DataTable();
+        $('#alertsTable').DataTable();
+    });
+</script>
+{% endblock %}

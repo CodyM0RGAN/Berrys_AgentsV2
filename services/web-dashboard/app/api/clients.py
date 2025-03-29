@@ -6,14 +6,14 @@ from typing import Dict, Optional
 
 from flask import current_app, g
 
-# Import centralized client implementations
+# Import synchronized client implementations
 from shared.utils.src.clients import (
-    AgentOrchestratorClient,
-    ModelOrchestrationClient,
-    PlanningSystemClient,
-    ProjectCoordinatorClient,
-    ServiceIntegrationClient,
-    ToolIntegrationClient
+    SyncAgentOrchestratorClient,
+    SyncModelOrchestrationClient,
+    SyncPlanningSystemClient,
+    SyncProjectCoordinatorClient,
+    SyncServiceIntegrationClient,
+    SyncToolIntegrationClient
 )
 
 # Set up logger
@@ -34,87 +34,87 @@ def init_api_clients(app) -> None:
     logger.info(f"Service Integration API URL: {app.config.get('SERVICE_INTEGRATION_API_URL')}")
     logger.info(f"Tool Integration API URL: {app.config.get('TOOL_INTEGRATION_API_URL')}")
 
-def get_agent_orchestrator_client() -> AgentOrchestratorClient:
+def get_agent_orchestrator_client() -> SyncAgentOrchestratorClient:
     """
     Get or create an Agent Orchestrator API client.
     
     Returns:
-        AgentOrchestratorClient instance
+        SyncAgentOrchestratorClient instance
     """
     if 'agent_orchestrator_client' not in g:
         base_url = current_app.config.get('AGENT_ORCHESTRATOR_API_URL')
         timeout = current_app.config.get('API_TIMEOUT')
-        g.agent_orchestrator_client = AgentOrchestratorClient(base_url, timeout)
+        g.agent_orchestrator_client = SyncAgentOrchestratorClient(base_url, timeout)
     
     return g.agent_orchestrator_client
 
-def get_project_coordinator_client() -> ProjectCoordinatorClient:
+def get_project_coordinator_client() -> SyncProjectCoordinatorClient:
     """
     Get or create a Project Coordinator API client.
     
     Returns:
-        ProjectCoordinatorClient instance
+        SyncProjectCoordinatorClient instance
     """
     if 'project_coordinator_client' not in g:
         base_url = current_app.config.get('PROJECT_COORDINATOR_API_URL')
         timeout = current_app.config.get('API_TIMEOUT')
-        g.project_coordinator_client = ProjectCoordinatorClient(base_url, timeout)
+        g.project_coordinator_client = SyncProjectCoordinatorClient(base_url, timeout)
     
     return g.project_coordinator_client
 
-def get_model_orchestration_client() -> ModelOrchestrationClient:
+def get_model_orchestration_client() -> SyncModelOrchestrationClient:
     """
     Get or create a Model Orchestration API client.
     
     Returns:
-        ModelOrchestrationClient instance
+        SyncModelOrchestrationClient instance
     """
     if 'model_orchestration_client' not in g:
         base_url = current_app.config.get('MODEL_ORCHESTRATION_API_URL')
         timeout = current_app.config.get('API_TIMEOUT')
-        g.model_orchestration_client = ModelOrchestrationClient(base_url, timeout)
+        g.model_orchestration_client = SyncModelOrchestrationClient(base_url, timeout)
     
     return g.model_orchestration_client
 
-def get_planning_system_client() -> PlanningSystemClient:
+def get_planning_system_client() -> SyncPlanningSystemClient:
     """
     Get or create a Planning System API client.
     
     Returns:
-        PlanningSystemClient instance
+        SyncPlanningSystemClient instance
     """
     if 'planning_system_client' not in g:
         base_url = current_app.config.get('PLANNING_SYSTEM_API_URL')
         timeout = current_app.config.get('API_TIMEOUT')
-        g.planning_system_client = PlanningSystemClient(base_url, timeout)
+        g.planning_system_client = SyncPlanningSystemClient(base_url, timeout)
     
     return g.planning_system_client
 
-def get_service_integration_client() -> ServiceIntegrationClient:
+def get_service_integration_client() -> SyncServiceIntegrationClient:
     """
     Get or create a Service Integration API client.
     
     Returns:
-        ServiceIntegrationClient instance
+        SyncServiceIntegrationClient instance
     """
     if 'service_integration_client' not in g:
         base_url = current_app.config.get('SERVICE_INTEGRATION_API_URL')
         timeout = current_app.config.get('API_TIMEOUT')
-        g.service_integration_client = ServiceIntegrationClient(base_url, timeout)
+        g.service_integration_client = SyncServiceIntegrationClient(base_url, timeout)
     
     return g.service_integration_client
 
-def get_tool_integration_client() -> ToolIntegrationClient:
+def get_tool_integration_client() -> SyncToolIntegrationClient:
     """
     Get or create a Tool Integration API client.
     
     Returns:
-        ToolIntegrationClient instance
+        SyncToolIntegrationClient instance
     """
     if 'tool_integration_client' not in g:
         base_url = current_app.config.get('TOOL_INTEGRATION_API_URL')
         timeout = current_app.config.get('API_TIMEOUT')
-        g.tool_integration_client = ToolIntegrationClient(base_url, timeout)
+        g.tool_integration_client = SyncToolIntegrationClient(base_url, timeout)
     
     return g.tool_integration_client
 

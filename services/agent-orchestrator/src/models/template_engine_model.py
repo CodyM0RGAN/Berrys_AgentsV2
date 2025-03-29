@@ -44,6 +44,7 @@ class AgentTemplateEngineModel(StandardModel):
     # Constraints
     __table_args__ = (
         UniqueConstraint('name', 'base_agent_type', name='uq_template_name_agent_type'),
+        {'extend_existing': True}
     )
     
     def __repr__(self):

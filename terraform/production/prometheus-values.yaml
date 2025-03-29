@@ -1,0 +1,372 @@
+# Prometheus values for production environment
+# This file is used to configure the Prometheus Helm chart
+
+# Global settings
+global:
+  evaluation_interval: 30s
+  scrape_interval: 30s
+  scrape_timeout: 10s
+
+# Prometheus settings
+prometheus:
+  prometheusSpec:
+    enableAdminAPI: false  # Security best practice
+    retention: 15d
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: berrys-standard
+          resources:
+            requests:
+              storage: 50Gi
+    securityContext:
+      fsGroup: 2000
+      runAsNonRoot: true
+      runAsUser: 1000
+    podMetadata:
+      labels:
+        app: prometheus
+        environment: production
+    serviceMonitorSelector:
+      matchLabels:
+        prometheus: berrys-production
+    ruleSelector:
+      matchLabels:
+        prometheus: berrys-production
+    # Additional Kubernetes Service Monitors for scraping our services
+    additionalServiceMonitors:
+      - name: berrys-services
+        selector:
+          matchLabels:
+            app.kubernetes.io/part-of: berrys-agents
+        namespaceSelector:
+          matchNames:
+            - berrys-production
+        endpoints:
+          - port: metrics
+            path: /metrics
+            interval: 15s
+            scheme: http
+      # Monitor for API Gateway
+      - name: api-gateway
+        selector:
+          matchLabels:
+            app: api-gateway
+        namespaceSelector:
+          matchNames:
+            - berrys-production
+        endpoints:
+          - port: metrics
+            path: /metrics
+            interval: 15s
+            scheme: http
+      # Monitor for Agent Orchestrator
+      - name: agent-orchestrator
+        selector:
+          matchLabels:
+            app: agent-orchestrator
+        namespaceSelector:
+          matchNames:
+            - berrys-production
+        endpoints:
+          - port: metrics
+            path: /metrics
+            interval: 15s
+            scheme: http
+      # Monitor for Model Orchestration
+      - name: model-orchestration
+        selector:
+          matchLabels:
+            app: model-orchestration
+        namespaceSelector:
+          matchNames:
+            - berrys-production
+        endpoints:
+          - port: metrics
+            path: /metrics
+            interval: 15s
+            scheme: http
+      # Monitor for Planning System
+      - name: planning-system
+        selector:
+          matchLabels:
+            app: planning-system
+        namespaceSelector:
+          matchNames:
+            - berrys-production
+        endpoints:
+          - port: metrics
+            path: /metrics
+            interval: 15s
+            scheme: http
+      # Monitor for Tool Integration
+      - name: tool-integration
+        selector:
+          matchLabels:
+            app: tool-integration
+        namespaceSelector:
+          matchNames:
+            - berrys-production
+        endpoints:
+          - port: metrics
+            path: /metrics
+            interval: 15s
+            scheme: http
+      # Monitor for Web Dashboard
+      - name: web-dashboard
+        selector:
+          matchLabels:
+            app: web-dashboard
+        namespaceSelector:
+          matchNames:
+            - berrys-production
+        endpoints:
+          - port: metrics
+            path: /metrics
+            interval: 15s
+            scheme: http
+
+# Alertmanager settings
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: berrys-standard
+          resources:
+            requests:
+              storage: 10Gi
+    securityContext:
+      fsGroup: 2000
+      runAsNonRoot: true
+      runAsUser: 1000
+    podMetadata:
+      labels:
+        app: alertmanager
+        environment: production
+    # Configure alerting routes
+    config:
+      global:
+        resolve_timeout: 5m
+        slack_api_url: ${SLACK_API_URL}
+      route:
+        group_by: ['job', 'alertname', 'severity']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 12h
+        receiver: 'slack-notifications'
+        routes:
+        - match:
+            severity: critical
+          receiver: 'pagerduty-critical'
+          continue: true
+        - match:
+            severity: warning
+          receiver: 'slack-notifications'
+          continue: true
+      receivers:
+      - name: 'slack-notifications'
+        slack_configs:
+        - channel: '#berrys-alerts'
+          send_resolved: true
+          title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] Monitoring Event'
+          text: >-
+            {{ range .Alerts }}
+              *Alert:* {{ .Annotations.summary }}
+              *Description:* {{ .Annotations.description }}
+              *Severity:* {{ .Labels.severity }}
+              *Details:*
+              {{ range .Labels.SortedPairs }} • *{{ .Name }}:* `{{ .Value }}`
+              {{ end }}
+            {{ end }}
+      - name: 'pagerduty-critical'
+        pagerduty_configs:
+        - service_key: ${PAGERDUTY_SERVICE_KEY}
+          send_resolved: true
+
+# Grafana settings
+grafana:
+  enabled: true
+  adminPassword: ${GRAFANA_ADMIN_PASSWORD}
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClassName: berrys-standard
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  securityContext:
+    runAsUser: 472
+    fsGroup: 472
+  serviceAccount:
+    create: true
+    name: grafana
+  podLabels:
+    app: grafana
+    environment: production
+  # Dashboards to deploy
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'berrys'
+        orgId: 1
+        folder: 'Berrys'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/berrys
+  dashboards:
+    berrys:
+      service-overview:
+        json: |
+          {
+            "annotations": {
+              "list": []
+            },
+            "editable": true,
+            "gnetId": null,
+            "graphTooltip": 0,
+            "id": null,
+            "links": [],
+            "panels": [
+              {
+                "aliasColors": {},
+                "bars": false,
+                "dashLength": 10,
+                "dashes": false,
+                "datasource": "Prometheus",
+                "fill": 1,
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 0,
+                  "y": 0
+                },
+                "id": 1,
+                "legend": {
+                  "avg": false,
+                  "current": false,
+                  "max": false,
+                  "min": false,
+                  "show": true,
+                  "total": false,
+                  "values": false
+                },
+                "lines": true,
+                "linewidth": 1,
+                "links": [],
+                "nullPointMode": "null",
+                "percentage": false,
+                "pointradius": 5,
+                "points": false,
+                "renderer": "flot",
+                "seriesOverrides": [],
+                "spaceLength": 10,
+                "stack": false,
+                "steppedLine": false,
+                "targets": [
+                  {
+                    "expr": "sum(rate(http_request_duration_seconds_count{job=~\".*\"}[5m])) by (job)",
+                    "format": "time_series",
+                    "intervalFactor": 1,
+                    "legendFormat": "{{job}}",
+                    "refId": "A"
+                  }
+                ],
+                "thresholds": [],
+                "timeFrom": null,
+                "timeShift": null,
+                "title": "Requests per second",
+                "tooltip": {
+                  "shared": true,
+                  "sort": 0,
+                  "value_type": "individual"
+                },
+                "type": "graph",
+                "xaxis": {
+                  "buckets": null,
+                  "mode": "time",
+                  "name": null,
+                  "show": true,
+                  "values": []
+                },
+                "yaxes": [
+                  {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                  },
+                  {
+                    "format": "short",
+                    "label": null,
+                    "logBase": 1,
+                    "max": null,
+                    "min": null,
+                    "show": true
+                  }
+                ]
+              }
+            ],
+            "refresh": "5s",
+            "schemaVersion": 16,
+            "style": "dark",
+            "tags": [
+              "berrys",
+              "services"
+            ],
+            "time": {
+              "from": "now-6h",
+              "to": "now"
+            },
+            "timepicker": {
+              "refresh_intervals": [
+                "5s",
+                "10s",
+                "30s",
+                "1m",
+                "5m",
+                "15m",
+                "30m",
+                "1h",
+                "2h",
+                "1d"
+              ],
+              "time_options": [
+                "5m",
+                "15m",
+                "1h",
+                "6h",
+                "12h",
+                "24h",
+                "2d",
+                "7d",
+                "30d"
+              ]
+            },
+            "timezone": "browser",
+            "title": "Service Overview",
+            "version": 0
+          }

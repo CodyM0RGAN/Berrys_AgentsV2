@@ -1,0 +1,96 @@
+name: Testing
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      python_version:
+        required: false
+        type: string
+        default: '3.10'
+      coverage_threshold:
+        required: false
+        type: number
+        default: 80
+      test_dir:
+        required: false
+        type: string
+        default: 'tests'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python ${{ inputs.python_version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python_version }}
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pytest pytest-cov coverage
+          
+      - name: Run tests with coverage
+        run: |
+          cd services/${{ inputs.service_name }}
+          python -m pytest ${{ inputs.test_dir }} \
+            --cov=src \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:coverage_html \
+            --cov-fail-under=${{ inputs.coverage_threshold }}
+          
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.service_name }}-coverage-reports
+          path: services/${{ inputs.service_name }}/coverage*
+          
+      - name: Generate coverage badge
+        if: success()
+        run: |
+          cd services/${{ inputs.service_name }}
+          python -c "
+          import xml.etree.ElementTree as ET
+          import requests
+          
+          # Parse coverage.xml to get coverage percentage
+          tree = ET.parse('coverage.xml')
+          root = tree.getroot()
+          coverage_pct = float(root.attrib['line-rate']) * 100
+          
+          # Determine badge color
+          if coverage_pct >= 90:
+              color = 'brightgreen'
+          elif coverage_pct >= 80:
+              color = 'green'
+          elif coverage_pct >= 70:
+              color = 'yellowgreen'
+          elif coverage_pct >= 60:
+              color = 'yellow'
+          elif coverage_pct >= 50:
+              color = 'orange'
+          else:
+              color = 'red'
+          
+          # Generate badge using shields.io
+          url = f'https://img.shields.io/badge/coverage-{coverage_pct:.1f}%25-{color}'
+          response = requests.get(url)
+          
+          with open('coverage_badge.svg', 'wb') as f:
+              f.write(response.content)
+          "
+          
+      - name: Upload coverage badge
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.service_name }}-coverage-badge
+          path: services/${{ inputs.service_name }}/coverage_badge.svg

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dependencies import get_db_session, get_current_user, get_current_user_admin_only
+from ..dependencies import get_db, get_current_user, get_current_user_admin_only
 from ..models.template_engine import (
     TemplateType,
     AgentTemplate as TemplateEngine,
@@ -50,7 +50,7 @@ async def list_templates(
     is_public: Optional[bool] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     List templates with filtering options.
@@ -111,7 +111,7 @@ async def list_templates(
 @router.get("/{template_id}", response_model=TemplateEngineResponse)
 async def get_template(
     template_id: UUID = Path(..., description="Template ID"),
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     Get a template by ID.
@@ -153,7 +153,7 @@ async def get_template(
 @router.post("/", response_model=TemplateEngineResponse)
 async def create_template(
     template: TemplateEngineCreate,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -207,7 +207,7 @@ async def create_template(
 async def update_template(
     template_id: UUID = Path(..., description="Template ID"),
     template: TemplateEngineUpdate = None,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -258,7 +258,7 @@ async def update_template(
 @router.delete("/{template_id}", response_model=Dict[str, str])
 async def delete_template(
     template_id: UUID = Path(..., description="Template ID"),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user_admin_only)
 ):
     """
@@ -302,7 +302,7 @@ async def delete_template(
 @router.get("/{template_id}/versions", response_model=AgentTemplateVersionListResponse)
 async def list_template_versions(
     template_id: UUID = Path(..., description="Template ID"),
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     List all versions of a template.
@@ -345,7 +345,7 @@ async def list_template_versions(
 async def get_template_version(
     template_id: UUID = Path(..., description="Template ID"),
     version_number: int = Path(..., description="Version number"),
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     Get a specific version of a template.
@@ -390,7 +390,7 @@ async def get_template_version(
 async def create_template_version(
     template_id: UUID = Path(..., description="Template ID"),
     changelog: str = Query(..., description="Changelog message"),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -441,7 +441,7 @@ async def create_template_version(
 async def revert_to_version(
     template_id: UUID = Path(..., description="Template ID"),
     version_number: int = Path(..., description="Version number"),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -489,7 +489,7 @@ async def compare_versions(
     template_id: UUID = Path(..., description="Template ID"),
     version1: int = Query(..., description="First version number"),
     version2: int = Query(..., description="Second version number"),
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     Compare two versions of a template.
@@ -534,7 +534,7 @@ async def compare_versions(
 
 @router.get("/tags", response_model=TemplateTagListResponse)
 async def list_tags(
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     List all template tags.
@@ -569,7 +569,7 @@ async def list_tags(
 @router.post("/tags", response_model=TemplateTagResponse)
 async def create_tag(
     tag: TemplateTagCreate,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -614,7 +614,7 @@ async def create_tag(
 async def update_tag(
     tag_id: UUID = Path(..., description="Tag ID"),
     tag: TemplateTagUpdate = None,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -665,7 +665,7 @@ async def update_tag(
 @router.delete("/tags/{tag_id}", response_model=Dict[str, str])
 async def delete_tag(
     tag_id: UUID = Path(..., description="Tag ID"),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user_admin_only)
 ):
     """
@@ -710,7 +710,7 @@ async def delete_tag(
 async def add_tag_to_template(
     template_id: UUID = Path(..., description="Template ID"),
     tag_id: UUID = Path(..., description="Tag ID"),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -762,7 +762,7 @@ async def add_tag_to_template(
 async def remove_tag_from_template(
     template_id: UUID = Path(..., description="Template ID"),
     tag_id: UUID = Path(..., description="Tag ID"),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """
@@ -808,7 +808,7 @@ async def remove_tag_from_template(
 @router.get("/{template_id}/tags", response_model=TemplateTagListResponse)
 async def get_template_tags(
     template_id: UUID = Path(..., description="Template ID"),
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     Get all tags for a template.
@@ -850,7 +850,7 @@ async def get_template_tags(
 @router.post("/import", response_model=Dict[str, Any])
 async def import_templates(
     import_source: TemplateImportSource,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
     current_user: Dict[str, Any] = Depends(get_current_user_admin_only)
 ):
     """
@@ -899,7 +899,7 @@ async def import_templates(
 async def customize_template(
     template_id: UUID = Path(..., description="Template ID"),
     customization: TemplateCustomization = None,
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """
     Apply customization to a template.

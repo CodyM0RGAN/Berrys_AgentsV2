@@ -34,18 +34,39 @@ def upgrade():
     # Standardize JSON columns to use JSONB
     op.execute("""
     -- Convert JSON columns to JSONB
-    ALTER TABLE project ALTER COLUMN project_metadata TYPE JSONB USING project_metadata::jsonb;
-    ALTER TABLE project_resource ALTER COLUMN resource_metadata TYPE JSONB USING resource_metadata::jsonb;
-    ALTER TABLE project_artifact ALTER COLUMN artifact_metadata TYPE JSONB USING artifact_metadata::jsonb;
-    ALTER TABLE chat_session ALTER COLUMN session_metadata TYPE JSONB USING session_metadata::jsonb;
-    ALTER TABLE chat_message ALTER COLUMN message_metadata TYPE JSONB USING message_metadata::jsonb;
-    
-    -- Set default empty JSON object for metadata columns
-    ALTER TABLE project ALTER COLUMN project_metadata SET DEFAULT '{}'::jsonb;
-    ALTER TABLE project_resource ALTER COLUMN resource_metadata SET DEFAULT '{}'::jsonb;
-    ALTER TABLE project_artifact ALTER COLUMN artifact_metadata SET DEFAULT '{}'::jsonb;
-    ALTER TABLE chat_session ALTER COLUMN session_metadata SET DEFAULT '{}'::jsonb;
-    ALTER TABLE chat_message ALTER COLUMN message_metadata SET DEFAULT '{}'::jsonb;
+    DO $$
+    BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project' AND table_schema = 'public') AND
+           EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project' AND column_name = 'project_metadata') THEN
+            ALTER TABLE project ALTER COLUMN project_metadata TYPE JSONB USING project_metadata::jsonb;
+            ALTER TABLE project ALTER COLUMN project_metadata SET DEFAULT '{}'::jsonb;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_resource' AND table_schema = 'public') AND
+           EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project_resource' AND column_name = 'resource_metadata') THEN
+            ALTER TABLE project_resource ALTER COLUMN resource_metadata TYPE JSONB USING resource_metadata::jsonb;
+            ALTER TABLE project_resource ALTER COLUMN resource_metadata SET DEFAULT '{}'::jsonb;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_artifact' AND table_schema = 'public') AND
+           EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project_artifact' AND column_name = 'artifact_metadata') THEN
+            ALTER TABLE project_artifact ALTER COLUMN artifact_metadata TYPE JSONB USING artifact_metadata::jsonb;
+            ALTER TABLE project_artifact ALTER COLUMN artifact_metadata SET DEFAULT '{}'::jsonb;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'chat_session' AND table_schema = 'public') AND
+           EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_session' AND column_name = 'session_metadata') THEN
+            ALTER TABLE chat_session ALTER COLUMN session_metadata TYPE JSONB USING session_metadata::jsonb;
+            ALTER TABLE chat_session ALTER COLUMN session_metadata SET DEFAULT '{}'::jsonb;
+        END IF;
+        
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'chat_message' AND table_schema = 'public') AND
+           EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_message' AND column_name = 'message_metadata') THEN
+            ALTER TABLE chat_message ALTER COLUMN message_metadata TYPE JSONB USING message_metadata::jsonb;
+            ALTER TABLE chat_message ALTER COLUMN message_metadata SET DEFAULT '{}'::jsonb;
+        END IF;
+    END
+    $$;
     """)
     
     # Add any missing metadata columns
@@ -53,33 +74,33 @@ def upgrade():
     -- Add metadata columns to tables that don't have them
     DO $$
     BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'project_state' AND column_name = 'state_metadata') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_state' AND table_schema = 'public') AND
+           NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project_state' AND column_name = 'state_metadata') THEN
             ALTER TABLE project_state ADD COLUMN state_metadata JSONB DEFAULT '{}'::jsonb;
         END IF;
         
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'project_progress' AND column_name = 'progress_metadata') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_progress' AND table_schema = 'public') AND
+           NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project_progress' AND column_name = 'progress_metadata') THEN
             ALTER TABLE project_progress ADD COLUMN progress_metadata JSONB DEFAULT '{}'::jsonb;
         END IF;
         
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'project_analytic' AND column_name = 'analytic_metadata') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'project_analytic' AND table_schema = 'public') AND
+           NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'project_analytic' AND column_name = 'analytic_metadata') THEN
             ALTER TABLE project_analytic ADD COLUMN analytic_metadata JSONB DEFAULT '{}'::jsonb;
         END IF;
         
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'agent_instruction' AND column_name = 'instruction_metadata') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'agent_instruction' AND table_schema = 'public') AND
+           NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agent_instruction' AND column_name = 'instruction_metadata') THEN
             ALTER TABLE agent_instruction ADD COLUMN instruction_metadata JSONB DEFAULT '{}'::jsonb;
         END IF;
         
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'agent_capability' AND column_name = 'capability_metadata') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'agent_capability' AND table_schema = 'public') AND
+           NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agent_capability' AND column_name = 'capability_metadata') THEN
             ALTER TABLE agent_capability ADD COLUMN capability_metadata JSONB DEFAULT '{}'::jsonb;
         END IF;
         
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'agent_knowledge_domain' AND column_name = 'domain_metadata') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'agent_knowledge_domain' AND table_schema = 'public') AND
+           NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agent_knowledge_domain' AND column_name = 'domain_metadata') THEN
             ALTER TABLE agent_knowledge_domain ADD COLUMN domain_metadata JSONB DEFAULT '{}'::jsonb;
         END IF;
     END
